@@ -1,0 +1,17 @@
+sync_dir = "/onedrive/data"
+drive_id = "b!ibeLUyPaF0ur1hkrcbhXkzTscZEbiMxGvfoKduTMYDXM1z-EUg0ySZPGcJxj_EoQ"
+
+log_dir = "/onedrive/logs/"
+
+#skip_dir = "DIR/_app"
+
+sync_dir_permissions = "755"
+sync_file_permissions = "644"
+
+download_only = "true"
+cleanup_local_files = "true"
+
+bypass_data_preservation = "true"
+
+#resync = "true"
+#resync_auth = "true"

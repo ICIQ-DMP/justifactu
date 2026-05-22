@@ -15,10 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Python dependencies
 COPY pyproject.toml .
+COPY src ./src
 RUN pip install --no-cache-dir .
 
-# Copy application code
-COPY src ./src
-
 # Run the application
-CMD ["python", "src/main.py"]
+CMD ["python", "-m", "justifactu"]

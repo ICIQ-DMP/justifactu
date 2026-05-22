@@ -2,7 +2,7 @@ import argparse
 import os.path
 import sys
 
-from defines import ROOT_FOLDER
+from justifactu.defines import ROOT_FOLDER
 
 
 def parse_boolean(value):

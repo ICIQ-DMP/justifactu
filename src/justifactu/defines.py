@@ -1,7 +1,7 @@
 import datetime
 from pathlib import Path
 
-ROOT_FOLDER: Path = Path(__file__).resolve().parent.parent
+ROOT_FOLDER: Path = Path(__file__).resolve().parent.parent.parent
 PROJECT_DIR: Path = ROOT_FOLDER  # alias kept for compatibility
 
 DATETIME_FORMAT = "%Y-%m-%d_%H-%M-%S"

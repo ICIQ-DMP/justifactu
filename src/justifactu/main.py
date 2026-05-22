@@ -3,9 +3,9 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from arguments import process_parse_arguments
-from pdf import parse_sap_id_from_bill
-from filesystem import list_dir
+from justifactu.arguments import process_parse_arguments
+from justifactu.pdf import parse_sap_id_from_bill
+from justifactu.filesystem import list_dir
 
 logger = None
 

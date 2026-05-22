@@ -83,7 +83,7 @@ test: dev  ## Run tests
 #   make run CMD="run -f demo.nds --debug"
 CMD ?= --help
 run: install  ## Run the justifactu CLI (python -m justifactu)
-	@$(PYTHON_BIN) -m justifactu "$(CMD)"
+	@$(PYTHON) -m $(PKG_NAME) $(CMD)
 
 
 # ---- docker ---------------------------------------------------------------

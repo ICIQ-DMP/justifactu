@@ -2,7 +2,7 @@ import re
 
 from pypdf import PdfReader
 
-from logger import get_logger
+from justifactu.logger import get_logger
 
 log = get_logger(__name__)
 

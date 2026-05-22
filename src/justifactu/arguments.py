@@ -2,7 +2,7 @@ import argparse
 import os.path
 import sys
 
-from src.defines import ROOT_FOLDER
+from defines import ROOT_FOLDER
 
 
 def parse_boolean(value):
@@ -45,7 +45,7 @@ def parse_input_location(value):
 
 def parse_arguments():
     """Parse and validate command-line arguments"""
-    parser = argparse.ArgumentParser(description="Justicier")
+    parser = argparse.ArgumentParser(description="Justifactu")
 
     parser.add_argument(
         "-l",

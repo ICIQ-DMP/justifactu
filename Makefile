@@ -15,8 +15,8 @@ SHELL := bash
 # ---- config ---------------------------------------------------------------
 
 # Check if python3.11 exists, otherwise default to python
-ifneq ($(shell command -v python3.11 2> /dev/null),)
-    PYTHON_BIN ?= python3.11
+ifneq ($(shell command -v python3.12 2> /dev/null),)
+    PYTHON_BIN ?= python3.12
 else
     PYTHON_BIN ?= python
 endif
@@ -27,7 +27,7 @@ PYTHON     := $(VENV_BIN)/python
 PIP        := $(VENV_BIN)/pip
 
 PKG_NAME   := justifactu
-DOCKER_IMAGE := AleixMT/justifactu
+DOCKER_IMAGE := davidromeroiciq/justifactu
 
 DEV_STAMP := $(VENV_DIR)/.dev-installed
 
@@ -83,15 +83,16 @@ test: dev  ## Run tests
 #   make run CMD="run -f demo.nds --debug"
 CMD ?= --help
 run: install  ## Run the justifactu CLI (python -m justifactu)
-	@$(PYTHON) -m $(PKG_NAME) $(CMD)
+	@$(PYTHON_BIN) -m justifactu "$(CMD)"
+
 
 # ---- docker ---------------------------------------------------------------
 
 docker-build:  ## Build the Docker image
-	@sudo docker build . -t $(DOCKER_IMAGE) --progress=plain
+	@sudo docker build . -t $(DOCKER_IMAGE):latest --progress=plain
 
 docker-push:  ## Push the Docker image
-	@sudo docker push $(DOCKER_IMAGE)
+	@sudo docker push $(DOCKER_IMAGE):latest
 
 # ---- maintenance ----------------------------------------------------------
 

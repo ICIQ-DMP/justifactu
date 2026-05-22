@@ -1,5 +1,5 @@
 # Use official lightweight Python image
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 # Prevent Python from writing .pyc files and buffering stdout
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -18,7 +18,7 @@ COPY pyproject.toml .
 RUN pip install --no-cache-dir .
 
 # Copy application code
-COPY src /app
+COPY src ./src
 
 # Run the application
 CMD ["python", "src/main.py"]

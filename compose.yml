@@ -7,7 +7,7 @@ services:
       onedrive:
         condition: service_healthy
     volumes:
-      - ./service/onedrive/data:/service/onedrive/data
+      - ./service/onedrive/data:/app/service/onedrive/data
     healthcheck:
       test: bash -c 'exec 3<>/dev/tcp/localhost/22'
       interval: 30s

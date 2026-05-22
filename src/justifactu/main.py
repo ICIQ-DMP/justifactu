@@ -5,7 +5,7 @@ from pathlib import Path
 
 from arguments import process_parse_arguments
 from pdf import parse_sap_id_from_bill
-from src.filesystem import list_dir
+from filesystem import list_dir
 
 logger = None
 

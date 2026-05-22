@@ -1,6 +1,4 @@
 import os.path
-import os.path
-import os.path
 import shutil
 from datetime import datetime
 from pathlib import Path
@@ -33,7 +31,9 @@ def datetime_range(begin, end):
 
     result = []
     while current <= end:
-        result.append(datetime.strptime(str(current.year * 100 + current.month), "%Y%m"))
+        result.append(
+            datetime.strptime(str(current.year * 100 + current.month), "%Y%m")
+        )
         if current.month == 12:
             current = datetime(current.year + 1, 1, 1)
         else:
@@ -55,7 +55,9 @@ def main():
     if args.input_location:
         INPUT_FOLDER = args.input_location
     else:
-        INPUT_FOLDER = Path("./service/onedrive/data/Justificació Projectes/Automatització Vinculacio Pagaments/_input")
+        INPUT_FOLDER = Path(
+            "./service/onedrive/data/Justificació Projectes/Automatització Vinculacio Pagaments/_input"
+        )
 
     REMESES_FOLDER = os.path.join(INPUT_FOLDER, "Remeses")
 
@@ -77,7 +79,13 @@ def main():
     folders_to_process = []
     for year in years_to_process:
         for remesa_folder_names in REMESES_FOLDER_NAMES:
-            folders_to_process.append(os.path.join(REMESES_FOLDER, REMESA_PER_YEAR_PREFIX + str(year), remesa_folder_names))
+            folders_to_process.append(
+                os.path.join(
+                    REMESES_FOLDER,
+                    REMESA_PER_YEAR_PREFIX + str(year),
+                    remesa_folder_names,
+                )
+            )
 
     for folder in folders_to_process:
         remesa_folders = list_dir(folder)
@@ -85,7 +93,9 @@ def main():
             for file in list_dir(os.path.join(folder, remesa_folder)):
                 if file.endswith(".xls") or file.endswith(".xlsx"):
                     continue
-                bill_id = parse_sap_id_from_bill(os.path.join(folder, remesa_folder, file))
+                bill_id = parse_sap_id_from_bill(
+                    os.path.join(folder, remesa_folder, file)
+                )
                 source = os.path.join(folder, remesa_folder, file)
                 print(folder)
                 print(remesa_folder)
@@ -93,8 +103,6 @@ def main():
                 print(file)
                 dest = os.path.join(folder, remesa_folder, bill_id)
                 shutil.move(source, dest)
-
-
 
     print(f"input folder is {INPUT_FOLDER}")
     print("Justifactu process is finished.")

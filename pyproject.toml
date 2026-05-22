@@ -1,34 +1,18 @@
 [project]
-name = "justicier"
+name = "justifactu"
 dynamic = ["version"]
-description = "Automated salary justifications"
+description = "Automated billing justifications"
 readme = "README.md"
-requires-python = ">=3.11"
-authors = [{name="AleixMT"}]
+requires-python = ">=3.12"
+authors = [{name="AleixMT"}, {name="DavidRomeroICIQ"}]
 license = {text="GPL-3.0-or-later"}
 dependencies = [
-    "pandas",
-    "pandas-stubs",
-    "openpyxl",
-    "paramiko",
-    "types-paramiko",
-    "requests",
-    "msal",
-    "python-dotenv",
-    "rich",
-    "typer",
-    "types-requests",
-    "pypdf",
-    "PyPDF2",
-    "PyCryptodome",
-    "Office365-REST-Python-Client",
-    "pyfiglet",
-    "pytz",
+    "pypdf"
 ]
 
 
 [project.scripts]
-justicier = "justicier.__main__:main"
+justifactu = "justifactu.__main__:main"
 
 [project.optional-dependencies]
 dev = [
@@ -61,5 +45,8 @@ testpaths = ["tests"]
 pythonpath = "src"
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 strict = true
+
+[tool.black]
+target-version = ["py312"]

@@ -13,6 +13,7 @@ MESSAGE_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
 GENERAL_OUTPUT_FOLDER: Path = ROOT_FOLDER / "output"
 ADMIN_LOG_FOLDER: Path = GENERAL_OUTPUT_FOLDER / "_admin_logs"
 
+
 class LogLevel(str, Enum):
     """
     Logical log levels for the CLI.
@@ -71,6 +72,7 @@ def get_supervisor_log_path() -> Path:
 
 def get_user_log_path() -> Path:
     return get_default_log_path()
+
 
 class ExtendedLogger(logging.Logger):
     def trace(self: logging.Logger, message: str, *args: Any, **kwargs: Any) -> None:

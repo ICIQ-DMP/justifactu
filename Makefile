@@ -1,4 +1,4 @@
-# Makefile for justicier
+# Makefile for justifactu
 # Usage examples:
 #   make venv
 #   make lint
@@ -26,8 +26,8 @@ VENV_BIN   ?= $(VENV_DIR)/bin
 PYTHON     := $(VENV_BIN)/python
 PIP        := $(VENV_BIN)/pip
 
-PKG_NAME   := justicier
-DOCKER_IMAGE := AleixMT/justicier
+PKG_NAME   := justifactu
+DOCKER_IMAGE := AleixMT/justifactu
 
 DEV_STAMP := $(VENV_DIR)/.dev-installed
 
@@ -39,8 +39,8 @@ $(VENV_BIN)/python:
 	@$(PYTHON_BIN) -m venv "$(VENV_DIR)"
 	@$(PYTHON_BIN) -m pip install --upgrade pip
 
-# Install runtime dependencies (creates justicier executable)
-$(VENV_BIN)/justicier: $(VENV_BIN)/python pyproject.toml
+# Install runtime dependencies (creates justifactu executable)
+$(VENV_BIN)/justifactu: $(VENV_BIN)/python pyproject.toml
 	@$(PIP) install -e .
 
 # Install dev dependencies
@@ -60,7 +60,7 @@ $(VENV_BIN)/pyproject-build: $(VENV_BIN)/python
 venv: $(VENV_BIN)/python  ## Create virtualenv
 	@echo "✅ venv ready at $(VENV_DIR)"
 
-install: $(VENV_BIN)/justicier  ## Install package in editable mode
+install: $(VENV_BIN)/justifactu  ## Install package in editable mode
 
 dev: $(DEV_STAMP)  ## Install package and dev dependencies
 
@@ -82,7 +82,7 @@ test: dev  ## Run tests
 # Pass arguments to the CLI via CMD, e.g.:
 #   make run CMD="run -f demo.nds --debug"
 CMD ?= --help
-run: install  ## Run the justicier CLI (python -m justicier)
+run: install  ## Run the justifactu CLI (python -m justifactu)
 	@$(PYTHON) -m $(PKG_NAME) $(CMD)
 
 # ---- docker ---------------------------------------------------------------
@@ -96,7 +96,7 @@ docker-push:  ## Push the Docker image
 # ---- maintenance ----------------------------------------------------------
 
 clean:  ## Remove build/test artifacts
-	@rm -rf .pytest_cache .mypy_cache .ruff_cache dist build *.egg-info "$(VENV_DIR)"
+	@rm -rf .pytest_cache .mypy_cache .ruff_cache dist build *.egg-info src/*.egg-info "$(VENV_DIR)"
 
 # ---- meta -----------------------------------------------------------------
 

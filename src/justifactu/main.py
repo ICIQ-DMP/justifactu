@@ -53,16 +53,16 @@ def main():
     args = process_parse_arguments()
 
     if args.input_location:
-        INPUT_FOLDER = args.input_location
+        INPUT_FOLDER = Path(args.input_location)
     else:
         INPUT_FOLDER = Path(
             "./service/onedrive/data/Justificació Projectes/Automatització Vinculacio Pagaments/_input"
         )
 
-    REMESES_FOLDER = os.path.join(INPUT_FOLDER, "Remeses")
+    REMESES_FOLDER = INPUT_FOLDER / Path("Remeses")
 
-    REMESA_BBVA_FOLDER_NAME = "Remesa BBVA"
-    REMESA_SABADELL_FOLDER_NAME = "Remesa Sabadell"
+    REMESA_BBVA_FOLDER_NAME = Path("Remesa BBVA")
+    REMESA_SABADELL_FOLDER_NAME = Path("Remesa Sabadell")
 
     REMESES_FOLDER_NAMES = []
     REMESES_FOLDER_NAMES.append(REMESA_BBVA_FOLDER_NAME)
@@ -80,28 +80,25 @@ def main():
     for year in years_to_process:
         for remesa_folder_names in REMESES_FOLDER_NAMES:
             folders_to_process.append(
-                os.path.join(
-                    REMESES_FOLDER,
-                    REMESA_PER_YEAR_PREFIX + str(year),
-                    remesa_folder_names,
-                )
+                    REMESES_FOLDER /
+                    Path(REMESA_PER_YEAR_PREFIX + str(year)) /
+                    remesa_folder_names
             )
 
     for folder in folders_to_process:
         remesa_folders = list_dir(folder)
         for remesa_folder in remesa_folders:
-            for file in list_dir(os.path.join(folder, remesa_folder)):
-                if file.endswith(".xls") or file.endswith(".xlsx"):
+            for file in list_dir(folder / remesa_folder):
+                if str(file).endswith(".xls") or str(file).endswith(".xlsx"):
                     continue
-                bill_id = parse_sap_id_from_bill(
-                    os.path.join(folder, remesa_folder, file)
-                )
-                source = os.path.join(folder, remesa_folder, file)
+                bill_id = parse_sap_id_from_bill(folder / remesa_folder / file)
+
+                source = folder / remesa_folder / file
                 print(folder)
                 print(remesa_folder)
                 print(bill_id)
                 print(file)
-                dest = os.path.join(folder, remesa_folder, bill_id)
+                dest = folder / remesa_folder / bill_id
                 shutil.move(source, dest)
 
     print(f"input folder is {INPUT_FOLDER}")

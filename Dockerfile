@@ -19,4 +19,5 @@ COPY src ./src
 RUN pip install --no-cache-dir .
 
 # Run the application
-CMD ["python", "-m", "justifactu"]
+ENTRYPOINT ["python", "-m", "justifactu"]
+CMD []

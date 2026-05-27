@@ -3,6 +3,8 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
+import pypdf
+
 from justifactu.arguments import process_parse_arguments
 from justifactu.pdf import parse_sap_id_from_bill
 from justifactu.filesystem import list_dir
@@ -47,6 +49,15 @@ def reverse_dict(d: dict):
     for key in d.keys():
         r[d[key]] = key
     return r
+
+
+def process_bills_and_payments(bills_folder: Path, payments_folder: Path, merge_folder: Path, delete_processed: bool=False):
+    pdfWriter = pypdf.PdfWriter()
+    for filename in bills_folder.glob("*.pdf"):
+        pdf_file = open(filename, "rb")
+
+
+    pass
 
 
 def main():

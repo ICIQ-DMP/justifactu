@@ -13,6 +13,8 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    command:
+      ["--input-location", "/app/service/onedrive/data"]
 
 
   onedrive:

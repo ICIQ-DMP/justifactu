@@ -1,9 +1,9 @@
-import os.path
 import shutil
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
-import pypdf
+#import pypdf
 
 from justifactu.arguments import process_parse_arguments
 from justifactu.pdf import parse_sap_id_from_bill
@@ -12,23 +12,23 @@ from justifactu.filesystem import list_dir
 logger = None
 
 
-def compute_path(partial_path, extension):
+def compute_path(partial_path:str, extension:str) -> Path:
     suffix = 1
-    output_path = partial_path + extension
-    while os.path.exists(output_path):
+    output_path = Path(partial_path + extension)
+    while output_path.exists():
         if suffix < 100:
             str_suffix = "00" + str(suffix)
         elif suffix < 10:
             str_suffix = "0" + str(suffix)
         else:
             str_suffix = str(suffix)
-        output_path = partial_path + "_" + str_suffix + extension
+        output_path = Path(partial_path + "_" + str_suffix + extension)
         suffix += 1
 
     return output_path
 
 
-def datetime_range(begin, end):
+def datetime_range(begin: datetime, end: datetime) -> list[datetime]:
     current = datetime(begin.year, begin.month, 1)
 
     result = []
@@ -44,13 +44,13 @@ def datetime_range(begin, end):
     return result
 
 
-def reverse_dict(d: dict):
+def reverse_dict(d: dict[Any, Any]) -> dict[Any, Any]:
     r = {}
     for key in d.keys():
         r[d[key]] = key
     return r
 
-
+"""
 def process_bills_and_payments(bills_folder: Path, payments_folder: Path, merge_folder: Path, delete_processed: bool=False):
     pdfWriter = pypdf.PdfWriter()
     for filename in bills_folder.glob("*.pdf"):
@@ -58,16 +58,16 @@ def process_bills_and_payments(bills_folder: Path, payments_folder: Path, merge_
 
 
     pass
+"""
 
-
-def main():
+def main() -> None:
     args = process_parse_arguments()
 
     if args.input_location:
         INPUT_FOLDER = Path(args.input_location)
     else:
         INPUT_FOLDER = Path(
-            "./service/onedrive/data/Justificació Projectes/Automatització Vinculacio Pagaments/_input"
+            "./service/onedrive/data/justifactu/_input"
         )
 
     REMESES_FOLDER = INPUT_FOLDER / Path("Remeses")

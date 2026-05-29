@@ -1,4 +1,5 @@
 import re
+from pathlib import Path
 
 from pypdf import PdfReader
 
@@ -7,7 +8,7 @@ from justifactu.logger import get_logger
 log = get_logger(__name__)
 
 
-def parse_sap_id_from_bill(pdf_path):
+def parse_sap_id_from_bill(pdf_path: Path) -> str:
     query_str = r"Fra. \d{10}"
     # restricting the search with the beginning of the year, which appears in the line that
     # we are interested in, which contains the date.
@@ -26,7 +27,6 @@ def parse_sap_id_from_bill(pdf_path):
         if not match:
             continue
 
-        match = match.group(0)
-        match = match.replace("\n", "")
+        return match.group(0).replace("\n", "")
 
-        return str(match)
+    raise ValueError(f"No SAP ID found in {pdf_path}")

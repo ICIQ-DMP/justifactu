@@ -1,21 +1,17 @@
 import argparse
-import os.path
 import sys
+from pathlib import Path
 
 from justifactu.defines import ROOT_FOLDER
 
 
-def parse_boolean(value):
-    if value is True:
+def parse_boolean(value: str | bool) -> bool:
+    if isinstance(value, bool):
         return value
-    elif value is False:
-        return value
-    print("the value " + str(value))
-    if value is bool:
-        return value
-    if value == "True":
+    normalized_value = str(value).lower().strip()
+    if normalized_value == "True":
         return True
-    elif value == "False":
+    elif normalized_value == "False":
         return False
     raise ValueError(
         "The value "
@@ -24,7 +20,7 @@ def parse_boolean(value):
     )
 
 
-def parse_input_type(value):
+def parse_input_type(value: str) -> str:
     if value == "sharepoint":
         return value
     elif value == "local":
@@ -35,15 +31,16 @@ def parse_input_type(value):
         )
 
 
-def parse_input_location(value):
-    if not os.path.exists(value):
+def parse_input_location(value: str) -> Path:
+    path = Path(value)
+    if not path.exists():
         raise ValueError(f"Path {value} does not exist")
-    if not os.path.isdir(value):
+    if not path.is_dir():
         raise ValueError(f"Path {value} is not a directory")
-    return value
+    return path
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     """Parse and validate command-line arguments"""
     parser = argparse.ArgumentParser(description="Justifactu")
 
@@ -62,13 +59,12 @@ def parse_arguments():
         "--input-location",
         type=parse_input_location,
         required=False,
-        default=os.path.join(
+        default=Path(
             ROOT_FOLDER,
             "service",
             "onedrive",
             "data",
-            "Justificació Projectes",
-            "Automatitzacio Vinculacio Pagaments",
+            "justifactu",
             "_input",
         ),
         help="Path location of input data. If used, --location local is assumed.",
@@ -79,7 +75,7 @@ def parse_arguments():
     return args
 
 
-def process_parse_arguments():
+def process_parse_arguments() -> argparse.Namespace:
     common = (
         "Error parsing arguments. Program aborting. The arguments are: "
         + str(sys.argv)

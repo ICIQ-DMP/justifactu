@@ -1,9 +1,23 @@
+# justifactu - Automated billing justifications
+# Copyright (C) 2026  Aleix Mariné Tena (AleixMT), Carles de la Cuadra, David Romero San Millán (DavidRomeroICIQ)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
-
-#import pypdf
 
 from justifactu.arguments import process_parse_arguments
 from justifactu.pdf import parse_sap_id_from_bill
@@ -12,7 +26,7 @@ from justifactu.filesystem import list_dir
 logger = None
 
 
-def compute_path(partial_path:str, extension:str) -> Path:
+def compute_path(partial_path: str, extension: str) -> Path:
     suffix = 1
     output_path = Path(partial_path + extension)
     while output_path.exists():
@@ -50,15 +64,6 @@ def reverse_dict(d: dict[Any, Any]) -> dict[Any, Any]:
         r[d[key]] = key
     return r
 
-"""
-def process_bills_and_payments(bills_folder: Path, payments_folder: Path, merge_folder: Path, delete_processed: bool=False):
-    pdfWriter = pypdf.PdfWriter()
-    for filename in bills_folder.glob("*.pdf"):
-        pdf_file = open(filename, "rb")
-
-
-    pass
-"""
 
 def main() -> None:
     args = process_parse_arguments()
@@ -66,9 +71,7 @@ def main() -> None:
     if args.input_location:
         INPUT_FOLDER = Path(args.input_location)
     else:
-        INPUT_FOLDER = Path(
-            "./service/onedrive/data/justifactu/_input"
-        )
+        INPUT_FOLDER = Path("./service/onedrive/data/justifactu/_input")
 
     REMESES_FOLDER = INPUT_FOLDER / Path("Remeses")
 
@@ -91,9 +94,9 @@ def main() -> None:
     for year in years_to_process:
         for remesa_folder_names in REMESES_FOLDER_NAMES:
             folders_to_process.append(
-                    REMESES_FOLDER /
-                    Path(REMESA_PER_YEAR_PREFIX + str(year)) /
-                    remesa_folder_names
+                REMESES_FOLDER
+                / Path(REMESA_PER_YEAR_PREFIX + str(year))
+                / remesa_folder_names
             )
 
     for folder in folders_to_process:
@@ -115,7 +118,6 @@ def main() -> None:
     print(f"input folder is {INPUT_FOLDER}")
     print("Justifactu process is finished.")
     print("Sending notification email")
-
 
 
 if __name__ == "__main__":

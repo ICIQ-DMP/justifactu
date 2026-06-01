@@ -17,9 +17,9 @@
 import re
 from pathlib import Path
 
-import pypdf
-from pypdf import PdfReader
+from pypdf import PdfReader, PdfWriter
 
+from justifactu.filesystem import list_dir
 from justifactu.logger import get_logger
 
 log = get_logger(__name__)
@@ -49,6 +49,19 @@ def parse_sap_id_from_bill(pdf_path: Path) -> str:
     raise ValueError(f"No SAP ID found in {pdf_path}")
 
 
+def change_payment_name(pdf_file: Path, new_payment_name: str) -> None:
+    if not pdf_file.exists():
+        print(f"WARNING: File not found at {pdf_file}")
+        return
+
+    new_path = pdf_file.with_name(f"{new_payment_name}.pdf")
+
+    try:
+        pdf_file.rename(new_path)
+    except FileExistsError:
+        print(f"WARNING: A file named {new_path.name} already exists.")
+
+
 def process_bills_and_payments(
     bills_folder: Path,
     payments_folder: Path,
@@ -57,26 +70,42 @@ def process_bills_and_payments(
 ) -> None:
     merge_folder.mkdir(parents=True, exist_ok=True)
 
-    for bill_path in bills_folder.glob("*.pdf"):
-        payment_path = payments_folder / bill_path.name
+    payment_map = {}
+    # Index all payments by their SAP number only
+    for payment_path in list_dir(payments_folder):
+        if not str(payment_path).endswith(".pdf"):
+            log.warning(f"Skipping {payment_path} because it's not a PDF file")
+            continue
+        payment_numbers = re.sub(r"\D", "", payment_path.stem)
+        if not payment_numbers:
+            log.warning(
+                f"The payment number from this file {payment_path} can't be parsed. Skipping file."
+            )
+            continue
+        payment_map[payment_numbers] = payment_path
 
-        if payment_path.exists():
-            output_path = merge_folder / f"merged_{bill_path.name}"
-            writer = pypdf.PdfWriter()
+    # Check if SAP number matches bills and merge if true
+    for bill_path in list_dir(bills_folder):
+        bill_numbers = re.sub(r"\D", "", bill_path.stem)
+        matched_payment = payment_map.get(bill_numbers)
 
-            print(f"Merging: {bill_path.name}...")
+        if matched_payment:
+            output_path = merge_folder / f"{bill_numbers}_F_P.pdf"
+            writer = PdfWriter()
+
+            print(f"Merging: {bill_path.name} with {matched_payment.name}...")
 
             writer.append(bill_path)
-            writer.append(payment_path)
+            writer.append(matched_payment)
 
             with open(output_path, "wb") as f:
                 writer.write(f)
 
             if delete_processed:
                 bill_path.unlink()
-                payment_path.unlink()
-                print(f"Deleted processed originals for: {bill_path.name}")
+                matched_payment.unlink()
+                print(f"Deleted: {output_path}")
         else:
-            print(f"Warning: No matching payment found for {bill_path.name}")
+            print(f"WARNING: No matching payment for {bill_path.name}")
 
     pass

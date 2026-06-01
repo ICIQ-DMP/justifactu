@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Any
 
 from justifactu.arguments import process_parse_arguments
-from justifactu.pdf import parse_sap_id_from_bill
+from justifactu.pdf import parse_sap_id_from_bill, process_bills_and_payments
 from justifactu.filesystem import list_dir
 
 logger = None
@@ -73,6 +73,15 @@ def main() -> None:
     else:
         INPUT_FOLDER = Path("./service/onedrive/data/justifactu/_input")
 
+    NOW = datetime.now()
+
+    bills_folder = INPUT_FOLDER / "FACTURES"
+    payments_folder = INPUT_FOLDER / "PAGAMENTS"
+    bills_plus_payments_folder = INPUT_FOLDER / "FACTURES+PAGAMENTS"
+    process_bills_and_payments(
+        bills_folder, payments_folder, bills_plus_payments_folder
+    )
+
     REMESES_FOLDER = INPUT_FOLDER / Path("Remeses")
 
     REMESA_BBVA_FOLDER_NAME = Path("Remesa BBVA")
@@ -83,7 +92,7 @@ def main() -> None:
     REMESES_FOLDER_NAMES.append(REMESA_SABADELL_FOLDER_NAME)
 
     REMESA_PER_YEAR_PREFIX = "Remesa "
-    NOW = datetime.now()
+
     years_to_process = []
     years_to_process.append(NOW.year)
     if NOW.month <= 3:

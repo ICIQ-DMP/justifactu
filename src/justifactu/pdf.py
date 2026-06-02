@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
+import shutil
 from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
@@ -25,18 +26,68 @@ from justifactu.logger import get_logger
 log = get_logger(__name__)
 
 
+def recursive_name_change(pdf_path: Path) -> None:
+    root_path = Path(pdf_path)
+
+    if not root_path.is_dir():
+        print(f"WARNING: {pdf_path} is not a directory")
+        return
+
+    for entry in root_path.rglob("*"):
+
+        if entry.is_dir():
+            continue
+
+        if entry.stem.endswith("-P"):
+            continue
+
+        if entry.suffix != ".pdf":
+            print(f"Skipping file {entry}: non-PDF file")
+            continue
+
+        try:
+            print(f"Processing:{entry.name}...")
+
+            sap_id = parse_sap_id_from_bill(entry)
+
+            change_payment_name(entry, sap_id)
+
+            # copy_pdf(entry, path_al_output/202X_FACTURA+PAGAMENT)
+
+            print(f"Processed: {entry.name}")
+
+        except ValueError:
+            print(f"WARNING: skipped {entry.name}")
+
+        except Exception as e:
+            print(f"WARNING: {e}")
+
+
+def copy_pdf(origin_path: Path, target_path: Path) -> None:
+    # Check to avoid overwriting a file. Shouldn't come up since pdf naming is unique
+    dest_file = target_path / origin_path.name if target_path.is_dir() else target_path
+
+    # Changed from using except to raise for Exceptions
+    if dest_file.exists():
+        raise FileExistsError(f"Destination file already exists: {dest_file}")
+
+    if origin_path.suffix.lower() != ".pdf":
+        raise ValueError(f"Origin file {origin_path} is not a PDF file")
+
+    shutil.copy(origin_path, dest_file)
+
+    print(f"Copied: {origin_path}")
+
+
 def parse_sap_id_from_bill(pdf_path: Path) -> str:
-    query_str = r"Fra. \d{10}"
-    # restricting the search with the beginning of the year, which appears in the line that
-    # we are interested in, which contains the date.
+    # Regex query using a capture group to extract the SAP number
+    query_str = r"Fra\.?\s+(\d{10})"
     pattern = re.compile(query_str, re.MULTILINE)
 
     reader = PdfReader(pdf_path)
 
     for page_num, page in enumerate(reader.pages):
-        # Get text of the page
         text = page.extract_text()
-        print("text is: " + text)
         if not text:
             continue
 
@@ -44,7 +95,8 @@ def parse_sap_id_from_bill(pdf_path: Path) -> str:
         if not match:
             continue
 
-        return match.group(0).replace("\n", "")
+        # match.group(1) targets only the parenthesis
+        return match.group(1)
 
     raise ValueError(f"No SAP ID found in {pdf_path}")
 
@@ -54,7 +106,7 @@ def change_payment_name(pdf_file: Path, new_payment_name: str) -> None:
         print(f"WARNING: File not found at {pdf_file}")
         return
 
-    new_path = pdf_file.with_name(f"{new_payment_name}.pdf")
+    new_path = pdf_file.with_name(f"{new_payment_name}-P.pdf")
 
     try:
         pdf_file.rename(new_path)

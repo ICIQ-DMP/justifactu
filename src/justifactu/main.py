@@ -14,14 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from justifactu.arguments import process_parse_arguments
-from justifactu.pdf import parse_sap_id_from_bill, process_bills_and_payments
-from justifactu.filesystem import list_dir
+from justifactu.pdf import merge_bills_and_payments, rename_payments
 
 logger = None
 
@@ -66,67 +64,21 @@ def reverse_dict(d: dict[Any, Any]) -> dict[Any, Any]:
 
 
 def main() -> None:
+    """"""
+    # TODO: change main to allow for testing of first functions
     args = process_parse_arguments()
 
     if args.input_location:
-        INPUT_FOLDER = Path(args.input_location)
+        input_folder = Path(args.input_location)
     else:
-        INPUT_FOLDER = Path("./service/onedrive/data/justifactu/_input")
+        input_folder = Path("./service/onedrive/data/justifactu/_input")
 
-    NOW = datetime.now()
+    bills_folder = input_folder / "FACTURES"
+    payments_folder = input_folder / "Remeses"
+    bills_plus_payments_folder = input_folder / "FACTURES+PAGAMENTS"
 
-    bills_folder = INPUT_FOLDER / "FACTURES"
-    payments_folder = INPUT_FOLDER / "PAGAMENTS"
-    bills_plus_payments_folder = INPUT_FOLDER / "FACTURES+PAGAMENTS"
-    process_bills_and_payments(
-        bills_folder, payments_folder, bills_plus_payments_folder
-    )
-
-    REMESES_FOLDER = INPUT_FOLDER / Path("Remeses")
-
-    REMESA_BBVA_FOLDER_NAME = Path("Remesa BBVA")
-    REMESA_SABADELL_FOLDER_NAME = Path("Remesa Sabadell")
-
-    REMESES_FOLDER_NAMES = []
-    REMESES_FOLDER_NAMES.append(REMESA_BBVA_FOLDER_NAME)
-    REMESES_FOLDER_NAMES.append(REMESA_SABADELL_FOLDER_NAME)
-
-    REMESA_PER_YEAR_PREFIX = "Remesa "
-
-    years_to_process = []
-    years_to_process.append(NOW.year)
-    if NOW.month <= 3:
-        years_to_process.append(NOW.year - 1)
-    years_to_process.remove(2026)  # TODO: temporal for making tests
-
-    folders_to_process = []
-    for year in years_to_process:
-        for remesa_folder_names in REMESES_FOLDER_NAMES:
-            folders_to_process.append(
-                REMESES_FOLDER
-                / Path(REMESA_PER_YEAR_PREFIX + str(year))
-                / remesa_folder_names
-            )
-
-    for folder in folders_to_process:
-        remesa_folders = list_dir(folder)
-        for remesa_folder in remesa_folders:
-            for file in list_dir(folder / remesa_folder):
-                if str(file).endswith(".xls") or str(file).endswith(".xlsx"):
-                    continue
-                bill_id = parse_sap_id_from_bill(folder / remesa_folder / file)
-
-                source = folder / remesa_folder / file
-                print(folder)
-                print(remesa_folder)
-                print(bill_id)
-                print(file)
-                dest = folder / remesa_folder / bill_id
-                shutil.move(source, dest)
-
-    print(f"input folder is {INPUT_FOLDER}")
-    print("Justifactu process is finished.")
-    print("Sending notification email")
+    rename_payments(payments_folder)
+    merge_bills_and_payments(bills_folder, payments_folder, bills_plus_payments_folder)
 
 
 if __name__ == "__main__":

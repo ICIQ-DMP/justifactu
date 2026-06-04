@@ -13,7 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -21,7 +21,9 @@ from typing import Any
 from justifactu.arguments import process_parse_arguments
 from justifactu.pdf import merge_bills_and_payments, rename_payments
 
-logger = None
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter()
 
 
 def compute_path(partial_path: str, extension: str) -> Path:
@@ -65,20 +67,31 @@ def reverse_dict(d: dict[Any, Any]) -> dict[Any, Any]:
 
 def main() -> None:
     """"""
-    # TODO: change main to allow for testing of first functions
+    # TODO: revisar funcionament
     args = process_parse_arguments()
 
     if args.input_location:
         input_folder = Path(args.input_location)
     else:
         input_folder = Path("./service/onedrive/data/justifactu/_input")
-
-    bills_folder = input_folder / "FACTURES"
+    bills_folder = input_folder / "_stages" / "1" / "FACTURES"
     payments_folder = input_folder / "Remeses"
     bills_plus_payments_folder = input_folder / "FACTURES+PAGAMENTS"
 
-    rename_payments(payments_folder)
-    merge_bills_and_payments(bills_folder, payments_folder, bills_plus_payments_folder)
+    logger.info("Starting...")
+
+    try:
+        rename_payments(payments_folder)
+        merge_bills_and_payments(
+            bills_folder,
+            payments_folder,
+            bills_plus_payments_folder,
+            delete_processed=False,
+        )
+        logger.info("Finished...")
+
+    except Exception as e:
+        logger.critical(e)
 
 
 if __name__ == "__main__":

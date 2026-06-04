@@ -26,6 +26,7 @@ from justifactu.logger import get_logger
 log = get_logger(__name__)
 
 
+# TODO: apply current year or next filter and proper logging
 def rename_payments(pdf_path: Path) -> None:
     root_path = Path(pdf_path)
 
@@ -33,11 +34,14 @@ def rename_payments(pdf_path: Path) -> None:
         log.warning(f"{pdf_path} is not a directory")
         return
 
+    pattern = re.compile(r"\d{10}-P$")
+
     for entry in list(root_path.rglob("*")):
 
         if entry.is_dir():
             continue
-        if entry.stem.endswith(r"\d{10}-P"):
+
+        if pattern.search(entry.stem):
             continue
 
         if entry.suffix.lower() != ".pdf":
@@ -80,6 +84,7 @@ def copy_file(origin_path: Path, target_path: Path) -> None:
 
 
 def parse_sap_id_from_bill(pdf_path: Path) -> str:
+    """Read a PDF file to extract the SAP id"""
     # Regex query using a capture group to extract the SAP number
     query_str = r"Fra\.?\s+(\d{10})"
     pattern = re.compile(query_str, re.MULTILINE)
@@ -116,10 +121,63 @@ def change_file_name(file: Path, new_name: str) -> Path | None:
         return None
 
 
-# TODO rename_payments: se li passa la carpeta de remeses i recórrer tots els fitxers i canviar el nom.
-# Posar flag al log si no es pot canviar el nom
-# TODO recórrer tots els pagaments de Remeses i si tenen un nom SAP, buscar la factura corresponent, fusionar-la,
-# deixar-la a la carpeta corresponent i si no, apuntar un flag al log.
+# TODO fix only processing 2025 files
+def _extract_sap_number(filename: str) -> str:
+    """Extracts the numeric SAP ID from a filename."""
+    return re.sub(r"\D", "", filename).strip()
+
+
+def _index_payments(payments_folder: Path) -> dict[str, Path]:
+    """Scans the payments folder and returns a mapping of SAP numbers to file paths."""
+    payment_map: dict[str, Path] = {}
+
+    for payment_path in payments_folder.rglob("*.pdf"):
+        if not payment_path.is_file():
+            continue
+
+        if payment_path.stem.endswith("_merged"):
+            log.info(f"Skipping {payment_path} because it is already merged")
+            continue
+
+        sap_number = re.sub(r"\D", "", payment_path.stem)
+
+        if not sap_number:
+            log.warning(
+                f"Skipping {payment_path.name}: not renamed properly / can't be parsed."
+            )
+            continue
+
+        payment_map[sap_number] = payment_path
+
+    return payment_map
+
+
+def _merge_pdfs(bill_path: Path, payment_path: Path, output_path: Path) -> None:
+    """Merges payments to bills and saves into output_path"""
+    writer = PdfWriter()
+    writer.append(bill_path)
+    writer.append(payment_path)
+
+    with open(output_path, "wb") as f:
+        writer.write(f)
+    writer.close()
+
+
+def _cleanup_processed_files(
+    bill_path: Path, matched_payment: Path, delete_processed: bool
+) -> None:
+    """Renames the payment file and optionally deletes the bill file"""
+    new_name = f"{matched_payment.stem}_merged"
+    renamed_path = change_file_name(matched_payment, new_name)
+
+    if renamed_path is None:
+        log.error(f"Failed to rename processed payment file {matched_payment.name}")
+    else:
+        log.info(f"Renamed processed payment file {renamed_path.name}")
+
+    if delete_processed:
+        bill_path.unlink()
+        log.info(f"Deleted: {bill_path.name}")
 
 
 def merge_bills_and_payments(
@@ -128,27 +186,12 @@ def merge_bills_and_payments(
     merge_folder: Path,
     delete_processed: bool = False,
 ) -> None:
+
     merge_folder.mkdir(parents=True, exist_ok=True)
-
-    payment_map: dict[str, Path] = {}
+    payment_map = _index_payments(payments_folder)
     successful_payments: set[Path] = set()
-    # Index all payments by their SAP number only
-    for payment_path in list_dir(payments_folder):
-        if not payment_path.is_file() or payment_path.suffix.lower() != ".pdf":
-            log.warning(f"Skipping {payment_path} because it's not a PDF file")
-            continue
 
-        payment_numbers = re.sub(r"\D", "", payment_path.stem)
-
-        if not payment_numbers:
-            log.warning(
-                f"The payment number from {payment_path} can't be parsed. Skipping."
-            )
-            continue
-
-        payment_map[payment_numbers] = payment_path
-
-    # Check if SAP number matches bills and merge if true
+    # Process bills and look for matches
     for bill_path in list_dir(bills_folder):
         if not bill_path.is_file() or bill_path.suffix.lower() != ".pdf":
             continue
@@ -156,36 +199,23 @@ def merge_bills_and_payments(
         bill_numbers = re.sub(r"\D", "", bill_path.stem)
         matched_payment: Path | None = payment_map.get(bill_numbers)
 
-        if matched_payment:
-            output_folder = bill_numbers[:4] + "_FACTURA+PAGAMENT"
-            output_path = merge_folder / output_folder / f"{bill_numbers}_F_P.pdf"
-            writer = PdfWriter()
+        if not matched_payment:
+            log.error("No matching payment found for bill")
+            continue
 
-            log.info(f"Merging: {bill_path.name} with {matched_payment}...")
+        output_folder_name = f"{bill_numbers[:4]}_FACTURA+PAGAMENT"
+        output_folder_path = merge_folder / output_folder_name
+        output_folder_path.mkdir(parents=True, exist_ok=True)
 
-            writer.append(bill_path)
-            writer.append(matched_payment)
+        output_path = output_folder_path / f"{bill_numbers}_F_P.pdf"
 
-            with open(output_path, "wb") as f:
-                writer.write(f)
-            writer.close()
+        log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
+        _merge_pdfs(bill_path, matched_payment, output_path)
+        successful_payments.add(matched_payment)
+        _cleanup_processed_files(bill_path, matched_payment, delete_processed)
 
-            successful_payments.add(matched_payment)
-
-            new_name = f"{matched_payment.stem}_merged"
-            renamed_path = change_file_name(matched_payment, new_name)
-
-            if renamed_path is None:
-                log.error(
-                    f"Failed to rename processed payment file {matched_payment.name}"
-                )
-            else:
-                log.info(f"Renamed processed payment file {renamed_path.name}")
-
-            if delete_processed:
-                bill_path.unlink()
-                log.info(f"Deleted: {bill_path.name}")
-        else:
-            log.error(f"No matching payment for {bill_path.name}")
+    unmatched_payments = set(payment_map.values()) - successful_payments
+    for payment in unmatched_payments:
+        log.error(f"No matching payment found for {payment.name}")
 
     pass

@@ -26,8 +26,8 @@ from justifactu.logger import get_logger
 log = get_logger(__name__)
 
 
-# TODO: apply current year or next filter and proper logging
 def rename_payments(pdf_path: Path) -> None:
+    """Renames the files from the payments folder"""
     root_path = Path(pdf_path)
 
     if not root_path.is_dir():
@@ -68,11 +68,10 @@ def rename_payments(pdf_path: Path) -> None:
 
 
 def copy_file(origin_path: Path, target_path: Path) -> None:
-    """Copy a file to another location"""
+    """Copies a file to another location"""
     # Check to avoid overwriting a file.
     dest_file = target_path / origin_path.name if target_path.is_dir() else target_path
 
-    # Changed from using except to raise for Exceptions
     if dest_file.exists():
         raise FileExistsError(f"Destination file already exists: {dest_file}")
 
@@ -84,8 +83,7 @@ def copy_file(origin_path: Path, target_path: Path) -> None:
 
 
 def parse_sap_id_from_bill(pdf_path: Path) -> str:
-    """Read a PDF file to extract the SAP id"""
-    # Regex query using a capture group to extract the SAP number
+    """Reads a PDF file to extract the SAP id"""
     query_str = r"Fra\.?\s+(\d{10})"
     pattern = re.compile(query_str, re.MULTILINE)
 
@@ -100,13 +98,13 @@ def parse_sap_id_from_bill(pdf_path: Path) -> str:
         if not match:
             continue
 
-        # match.group(1) targets only the parenthesis
         return match.group(1)
 
     raise ValueError(f"No SAP ID found in {pdf_path}")
 
 
 def change_file_name(file: Path, new_name: str) -> Path | None:
+    """Changes the name of a file"""
     if not file.exists():
         log.warning(f"File not found at {file}")
         return None
@@ -121,10 +119,10 @@ def change_file_name(file: Path, new_name: str) -> Path | None:
         return None
 
 
-# TODO fix only processing 2025 files
 def _extract_sap_number(filename: str) -> str:
     """Extracts the numeric SAP ID from a filename."""
-    return re.sub(r"\D", "", filename).strip()
+
+    return re.sub(r"\D", "", filename)
 
 
 def _index_payments(payments_folder: Path) -> dict[str, Path]:
@@ -139,7 +137,13 @@ def _index_payments(payments_folder: Path) -> dict[str, Path]:
             log.info(f"Skipping {payment_path} because it is already merged")
             continue
 
-        sap_number = re.sub(r"\D", "", payment_path.stem)
+        sap_number = _extract_sap_number(payment_path.name)
+
+        if len(sap_number) != 10:
+            log.warning(
+                f"Skipping {payment_path.name}: SAP number has unexpected length ({len(sap_number)} digits)"
+            )
+            continue
 
         if not sap_number:
             log.warning(
@@ -152,11 +156,11 @@ def _index_payments(payments_folder: Path) -> dict[str, Path]:
     return payment_map
 
 
-def _merge_pdfs(bill_path: Path, payment_path: Path, output_path: Path) -> None:
-    """Merges payments to bills and saves into output_path"""
+def _merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
+    """Merges two PDF files into output_path"""
     writer = PdfWriter()
-    writer.append(bill_path)
-    writer.append(payment_path)
+    writer.append(first_pdf)
+    writer.append(second_pdf)
 
     with open(output_path, "wb") as f:
         writer.write(f)
@@ -186,6 +190,7 @@ def merge_bills_and_payments(
     merge_folder: Path,
     delete_processed: bool = False,
 ) -> None:
+    """Merges bills and payments and saves into merge_folder"""
 
     merge_folder.mkdir(parents=True, exist_ok=True)
     payment_map = _index_payments(payments_folder)
@@ -196,7 +201,7 @@ def merge_bills_and_payments(
         if not bill_path.is_file() or bill_path.suffix.lower() != ".pdf":
             continue
 
-        bill_numbers = re.sub(r"\D", "", bill_path.stem)
+        bill_numbers = _extract_sap_number(bill_path.stem)
         matched_payment: Path | None = payment_map.get(bill_numbers)
 
         if not matched_payment:

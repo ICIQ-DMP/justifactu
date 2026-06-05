@@ -67,16 +67,15 @@ def reverse_dict(d: dict[Any, Any]) -> dict[Any, Any]:
 
 def main() -> None:
     """"""
-    # TODO: revisar funcionament
     args = process_parse_arguments()
 
     if args.input_location:
         input_folder = Path(args.input_location)
     else:
         input_folder = Path("./service/onedrive/data/justifactu/_input")
-    bills_folder = input_folder / "_stages" / "1" / "FACTURES"
+    bills_folder = input_folder / "FACTURES"
     payments_folder = input_folder / "Remeses"
-    bills_plus_payments_folder = input_folder / "FACTURES+PAGAMENTS"
+    bills_plus_payments_folder = input_folder.parent / "_output" / "FACTURES+PAGAMENTS"
 
     logger.info("Starting...")
 

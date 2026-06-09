@@ -121,7 +121,6 @@ def change_file_name(file: Path, new_name: str) -> Path | None:
 
 def _extract_sap_number(filename: str) -> str:
     """Extracts the numeric SAP ID from a filename."""
-
     return re.sub(r"\D", "", filename)
 
 
@@ -190,15 +189,25 @@ def merge_bills_and_payments(
     merge_folder: Path,
     delete_processed: bool = False,
 ) -> None:
-    """Merges bills and payments and saves into merge_folder"""
+    """Merges bills and payments and saves them into merge_folder"""
 
     merge_folder.mkdir(parents=True, exist_ok=True)
     payment_map = _index_payments(payments_folder)
     successful_payments: set[Path] = set()
+    qa_folder = merge_folder / "QA_ERRORS"
+    expected_name = re.compile(r"F\s\d{10}")
 
     # Process bills and look for matches
     for bill_path in list_dir(bills_folder):
         if not bill_path.is_file() or bill_path.suffix.lower() != ".pdf":
+            continue
+
+        if not expected_name.fullmatch(bill_path.stem):
+            qa_folder.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(bill_path), str(qa_folder / bill_path.name))
+            log.error(
+                f"Failed to merge bill file {bill_path.name}, moved to QA folder: {bill_path.name}"
+            )
             continue
 
         bill_numbers = _extract_sap_number(bill_path.stem)

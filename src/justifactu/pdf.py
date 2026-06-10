@@ -26,17 +26,143 @@ from justifactu.logger import get_logger
 log = get_logger(__name__)
 
 
+def copy_file(origin_path: Path, target_path: Path) -> None:
+    """Copies a file to another location"""
+    # Check to avoid overwriting a file.
+    dest_file = target_path / origin_path.name if target_path.is_dir() else target_path
+
+    if dest_file.exists():
+        raise FileExistsError(f"Destination file already exists: {dest_file}")
+
+    dest_file.parent.mkdir(parents=True, exist_ok=True)
+
+    shutil.copy(origin_path, dest_file)
+
+    log.info(f"Copied: {origin_path} into {target_path}")
+
+
+def move_file(origin_path: Path, target_path: Path) -> None:
+    """Moves a file to another location"""
+    if not target_path.exists():
+        target_path.mkdir(parents=True, exist_ok=True)
+
+    if not target_path.is_dir():
+        log.warning(f"{target_path} is not a directory")
+        return
+
+    try:
+        shutil.move(origin_path, target_path)
+
+    except FileExistsError:
+        log.warning(f"Destination file already exists: {target_path}")
+    except Exception as e:
+        log.exception(f"Unexpected error: {e}")
+
+
+def change_file_name(file: Path, new_name: str) -> Path | None:
+    """Changes the name of a file"""
+    if not file.exists():
+        log.warning(f"File not found at {file}")
+        return None
+
+    new_path = file.with_stem(new_name)
+
+    try:
+        file.rename(new_path)
+        return new_path
+    except FileExistsError:
+        log.warning(f"A file named {new_path.name} already exists.")
+        return None
+
+
+def parse_sap_id_from_bill(pdf_path: Path) -> str:
+    """Reads a PDF file to extract the SAP id"""
+    query_str = r"Fra\.?\s+(\d{10})"
+    pattern = re.compile(query_str, re.MULTILINE)
+
+    reader = PdfReader(pdf_path)
+
+    for page in reader.pages:
+        text = page.extract_text()
+        if not text:
+            continue
+
+        match = pattern.search(text)
+        if not match:
+            continue
+
+        return match.group(1)
+
+    raise ValueError(f"No SAP ID found in {pdf_path}")
+
+
+def extract_sap_number(filename: str) -> str:
+    """Extracts the numeric SAP ID from a filename."""
+    return re.sub(r"\D", "", filename)
+
+
+def index_payments(payments_folder: Path) -> dict[str, Path]:
+    """Scans the payments folder and returns a mapping of SAP numbers to file paths."""
+    payment_map: dict[str, Path] = {}
+
+    for payment_path in payments_folder.rglob("*.pdf"):
+        if not payment_path.is_file():
+            continue
+
+        if payment_path.stem.endswith("_merged"):
+            log.info(f"Skipping {payment_path} because it is already merged")
+            continue
+
+        sap_number = extract_sap_number(payment_path.name)
+
+        if len(sap_number) != 10:
+            log.warning(
+                f"Skipping {payment_path.name}: SAP number has unexpected length ({len(sap_number)} digits)"
+            )
+            continue
+
+        payment_map[sap_number] = payment_path
+
+    return payment_map
+
+
+def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
+    """Merges two PDF files into output_path"""
+    writer = PdfWriter()
+    writer.append(first_pdf)
+    writer.append(second_pdf)
+
+    with open(output_path, "wb") as f:
+        writer.write(f)
+    writer.close()
+
+
+def cleanup_processed_files(
+    bill_path: Path, matched_payment: Path, delete_processed: bool
+) -> None:
+    """Renames the payment file and optionally deletes the bill file"""
+    new_name = f"{matched_payment.stem}_merged"
+    renamed_path = change_file_name(matched_payment, new_name)
+
+    if renamed_path is None:
+        log.error(f"Failed to rename processed payment file {matched_payment.name}")
+    else:
+        log.info(f"Renamed processed payment file {renamed_path.name}")
+
+    if delete_processed:
+        bill_path.unlink()
+        log.info(f"Deleted: {bill_path.name}")
+
+
 def rename_payments(pdf_path: Path) -> None:
     """Renames the files from the payments folder"""
-    root_path = Path(pdf_path)
-
-    if not root_path.is_dir():
+    if not pdf_path.is_dir():
         log.warning(f"{pdf_path} is not a directory")
         return
 
     pattern = re.compile(r"\d{10}-P$")
 
-    for entry in list(root_path.rglob("*")):
+    for entry in list(pdf_path.rglob("*")):
 
         if entry.is_dir():
             continue
@@ -67,122 +193,6 @@ def rename_payments(pdf_path: Path) -> None:
             log.exception(f"Unexpected error processing {entry.name}: {e}")
 
 
-def copy_file(origin_path: Path, target_path: Path) -> None:
-    """Copies a file to another location"""
-    # Check to avoid overwriting a file.
-    dest_file = target_path / origin_path.name if target_path.is_dir() else target_path
-
-    if dest_file.exists():
-        raise FileExistsError(f"Destination file already exists: {dest_file}")
-
-    target_path.mkdir(parents=True, exist_ok=True)
-
-    shutil.copy(origin_path, dest_file)
-
-    log.info(f"Copied: {origin_path} into {target_path}")
-
-
-def parse_sap_id_from_bill(pdf_path: Path) -> str:
-    """Reads a PDF file to extract the SAP id"""
-    query_str = r"Fra\.?\s+(\d{10})"
-    pattern = re.compile(query_str, re.MULTILINE)
-
-    reader = PdfReader(pdf_path)
-
-    for page_num, page in enumerate(reader.pages):
-        text = page.extract_text()
-        if not text:
-            continue
-
-        match = pattern.search(text)
-        if not match:
-            continue
-
-        return match.group(1)
-
-    raise ValueError(f"No SAP ID found in {pdf_path}")
-
-
-def change_file_name(file: Path, new_name: str) -> Path | None:
-    """Changes the name of a file"""
-    if not file.exists():
-        log.warning(f"File not found at {file}")
-        return None
-
-    new_path = file.with_stem(f"{new_name}")
-
-    try:
-        file.rename(new_path)
-        return new_path
-    except FileExistsError:
-        log.warning(f"A file named {new_path.name} already exists.")
-        return None
-
-
-def _extract_sap_number(filename: str) -> str:
-    """Extracts the numeric SAP ID from a filename."""
-    return re.sub(r"\D", "", filename)
-
-
-def _index_payments(payments_folder: Path) -> dict[str, Path]:
-    """Scans the payments folder and returns a mapping of SAP numbers to file paths."""
-    payment_map: dict[str, Path] = {}
-
-    for payment_path in payments_folder.rglob("*.pdf"):
-        if not payment_path.is_file():
-            continue
-
-        if payment_path.stem.endswith("_merged"):
-            log.info(f"Skipping {payment_path} because it is already merged")
-            continue
-
-        sap_number = _extract_sap_number(payment_path.name)
-
-        if len(sap_number) != 10:
-            log.warning(
-                f"Skipping {payment_path.name}: SAP number has unexpected length ({len(sap_number)} digits)"
-            )
-            continue
-
-        if not sap_number:
-            log.warning(
-                f"Skipping {payment_path.name}: not renamed properly / can't be parsed."
-            )
-            continue
-
-        payment_map[sap_number] = payment_path
-
-    return payment_map
-
-
-def _merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
-    """Merges two PDF files into output_path"""
-    writer = PdfWriter()
-    writer.append(first_pdf)
-    writer.append(second_pdf)
-
-    with open(output_path, "wb") as f:
-        writer.write(f)
-    writer.close()
-
-
-def _cleanup_processed_files(
-    bill_path: Path, matched_payment: Path, delete_processed: bool
-) -> None:
-    """Renames the payment file and optionally deletes the bill file"""
-    new_name = f"{matched_payment.stem}_merged"
-    renamed_path = change_file_name(matched_payment, new_name)
-
-    if renamed_path is None:
-        log.error(f"Failed to rename processed payment file {matched_payment.name}")
-    else:
-        log.info(f"Renamed processed payment file {renamed_path.name}")
-
-    if delete_processed:
-        bill_path.unlink()
-        log.info(f"Deleted: {bill_path.name}")
-
-
 def merge_bills_and_payments(
     bills_folder: Path,
     payments_folder: Path,
@@ -192,7 +202,7 @@ def merge_bills_and_payments(
     """Merges bills and payments and saves them into merge_folder"""
 
     merge_folder.mkdir(parents=True, exist_ok=True)
-    payment_map = _index_payments(payments_folder)
+    payment_map = index_payments(payments_folder)
     successful_payments: set[Path] = set()
     qa_folder = merge_folder / "QA_ERRORS"
     expected_name = re.compile(r"F\s\d{10}")
@@ -203,14 +213,13 @@ def merge_bills_and_payments(
             continue
 
         if not expected_name.fullmatch(bill_path.stem):
-            qa_folder.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(bill_path), str(qa_folder / bill_path.name))
+            move_file(bill_path, qa_folder)
             log.error(
                 f"Failed to merge bill file {bill_path.name}, moved to QA folder: {bill_path.name}"
             )
             continue
 
-        bill_numbers = _extract_sap_number(bill_path.stem)
+        bill_numbers = extract_sap_number(bill_path.stem)
         matched_payment: Path | None = payment_map.get(bill_numbers)
 
         if not matched_payment:
@@ -224,9 +233,9 @@ def merge_bills_and_payments(
         output_path = output_folder_path / f"{bill_numbers}_F_P.pdf"
 
         log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
-        _merge_pdfs(bill_path, matched_payment, output_path)
+        merge_pdfs(bill_path, matched_payment, output_path)
         successful_payments.add(matched_payment)
-        _cleanup_processed_files(bill_path, matched_payment, delete_processed)
+        cleanup_processed_files(bill_path, matched_payment, delete_processed)
 
     unmatched_payments = set(payment_map.values()) - successful_payments
     for payment in unmatched_payments:

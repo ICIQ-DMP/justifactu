@@ -43,18 +43,16 @@ def copy_file(origin_path: Path, target_path: Path) -> None:
 
 def move_file(origin_path: Path, target_path: Path) -> None:
     """Moves a file to another location"""
-    if not target_path.exists():
-        target_path.mkdir(parents=True, exist_ok=True)
+    dest_file = target_path / origin_path.name if target_path.is_dir() else target_path
 
-    if not target_path.is_dir():
-        log.warning(f"{target_path} is not a directory")
-        return
+    if not dest_file.parent.exists():
+        dest_file.parent.mkdir(parents=True, exist_ok=True)
 
     try:
-        shutil.move(origin_path, target_path)
-
+        shutil.move(origin_path, dest_file)
+        log.info(f"Moved: {origin_path} into {target_path}")
     except FileExistsError:
-        log.warning(f"Destination file already exists: {target_path}")
+        log.warning(f"Destination file already exists: {dest_file}")
     except Exception as e:
         log.exception(f"Unexpected error: {e}")
 
@@ -134,7 +132,7 @@ def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
 
     with open(output_path, "wb") as f:
         writer.write(f)
-    writer.close()
+        writer.close()
 
 
 def cleanup_processed_files(
@@ -163,7 +161,6 @@ def rename_payments(pdf_path: Path) -> None:
     pattern = re.compile(r"\d{10}-P$")
 
     for entry in list(pdf_path.rglob("*")):
-
         if entry.is_dir():
             continue
 
@@ -175,7 +172,7 @@ def rename_payments(pdf_path: Path) -> None:
             continue
 
         try:
-            log.info(f"Processing:{entry.name}...")
+            log.info(f"Processing: {entry.name}...")
 
             sap_id = parse_sap_id_from_bill(entry)
 
@@ -215,7 +212,8 @@ def merge_bills_and_payments(
         if not expected_name.fullmatch(bill_path.stem):
             move_file(bill_path, qa_folder)
             log.error(
-                f"Failed to merge bill file {bill_path.name}, moved to QA folder: {bill_path.name}"
+                f"Failed to merge bill file {bill_path.name}: unexpected name format, moved to QA folder",
+                extra={"qa_report": True},
             )
             continue
 
@@ -240,5 +238,3 @@ def merge_bills_and_payments(
     unmatched_payments = set(payment_map.values()) - successful_payments
     for payment in unmatched_payments:
         log.error(f"No matching payment found for {payment.name}")
-
-    pass

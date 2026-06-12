@@ -13,17 +13,20 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from justifactu.arguments import process_parse_arguments
+from justifactu.defines import NOW
+from justifactu.logger import (
+    ADMIN_LOG_FOLDER,
+    configure_logging_from_settings,
+    get_logger,
+)
 from justifactu.pdf import merge_bills_and_payments, rename_payments
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
-formatter = logging.Formatter()
+logger = get_logger(__name__)
 
 
 def compute_path(partial_path: str, extension: str) -> Path:
@@ -67,6 +70,10 @@ def reverse_dict(d: dict[Any, Any]) -> dict[Any, Any]:
 
 def main() -> None:
     """"""
+    configure_logging_from_settings(
+        moved_files_log_file=ADMIN_LOG_FOLDER / (NOW + "_qa_report.log"),
+    )
+
     args = process_parse_arguments()
 
     if args.input_location:

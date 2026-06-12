@@ -43,16 +43,16 @@ def copy_file(origin_path: Path, target_path: Path) -> None:
 
 def move_file(origin_path: Path, target_path: Path) -> None:
     """Moves a file to another location"""
-    dest_file = target_path / origin_path.name if target_path.is_dir() else target_path
-
-    if not dest_file.parent.exists():
-        dest_file.parent.mkdir(parents=True, exist_ok=True)
+    target_path.mkdir(parents=True, exist_ok=True)
+    dest_file = target_path / origin_path.name
 
     try:
         shutil.move(origin_path, dest_file)
         log.info(f"Moved: {origin_path} into {target_path}")
+
     except FileExistsError:
         log.warning(f"Destination file already exists: {dest_file}")
+
     except Exception as e:
         log.exception(f"Unexpected error: {e}")
 
@@ -68,6 +68,7 @@ def change_file_name(file: Path, new_name: str) -> Path | None:
     try:
         file.rename(new_path)
         return new_path
+
     except FileExistsError:
         log.warning(f"A file named {new_path.name} already exists.")
         return None

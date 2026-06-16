@@ -65,15 +65,15 @@ def change_file_name(file: Path, new_name: str) -> Path | None:
 
     new_path = file.with_stem(new_name)
 
-    try:
-        file.rename(new_path)
-        return new_path
-
-    except FileExistsError:
+    if new_path.exists():
         log.warning(f"A file named {new_path.name} already exists.")
         return None
 
+    file.rename(new_path)
+    return new_path
 
+
+# TODO: this func should go into a specific file, this is not related to pdfs, but to bills instead (bills.pdf ?)
 def parse_sap_id_from_bill(pdf_path: Path) -> str:
     """Reads a PDF file to extract the SAP id"""
     query_str = r"Fra\.?\s+(\d{10})"
@@ -97,9 +97,12 @@ def parse_sap_id_from_bill(pdf_path: Path) -> str:
 
 def extract_sap_number(filename: str) -> str:
     """Extracts the numeric SAP ID from a filename."""
-    return re.sub(r"\D", "", filename)
+    return re.sub(
+        r"\D", "", filename
+    )  # TODO: build specialized class SAP that know how to parse this.
 
 
+# TODO: this func should go into a specific file, this is not related to pdfs, but to payments instead (bills.pdf ?)
 def index_payments(payments_folder: Path) -> dict[str, Path]:
     """Scans the payments folder and returns a mapping of SAP numbers to file paths."""
     payment_map: dict[str, Path] = {}
@@ -136,6 +139,7 @@ def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
         writer.close()
 
 
+# TODO: this func should go into a specific file, this is not related to pdfs, but to payments instead (bills.pdf ?)
 def cleanup_processed_files(
     bill_path: Path, matched_payment: Path, delete_processed: bool
 ) -> None:
@@ -195,6 +199,8 @@ def rename_payments(pdf_path: Path) -> None:
             log.exception(f"Unexpected error processing {entry.name}: {e}")
 
 
+# TODO: this func should go into a specific file, this is not related to pdfs, but to the general process instead
+# (main.py ?)
 def merge_bills_and_payments(
     bills_folder: Path,
     payments_folder: Path,
@@ -207,7 +213,7 @@ def merge_bills_and_payments(
     payment_map = index_payments(payments_folder)
     successful_payments: set[Path] = set()
     qa_folder = merge_folder / "QA_ERRORS"
-    expected_name = re.compile(r"F\s\d{10}")
+    expected_name = re.compile(r"F\s\d{10}")  # TODO: delegate into SAP class
 
     # Process bills and look for matches
     for bill_path in list_dir(bills_folder):
@@ -228,7 +234,7 @@ def merge_bills_and_payments(
         if not matched_payment:
             log.error(f"No matching payment found for bill {bill_path}")
             continue
-
+        # TODO: This means that bill_numbers[:4] follow a specific format and the regexp can be more specific
         output_folder_name = f"{bill_numbers[:4]}_FACTURA+PAGAMENT"
         output_folder_path = merge_folder / output_folder_name
         output_folder_path.mkdir(parents=True, exist_ok=True)

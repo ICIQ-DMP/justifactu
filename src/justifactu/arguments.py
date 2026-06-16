@@ -1,32 +1,34 @@
+# justifactu - Automated billing justifications
+# Copyright (C) 2026  Aleix Mariné Tena (AleixMT), Carles de la Cuadra, David Romero San Millán (DavidRomeroICIQ)
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 import argparse
 import sys
 from pathlib import Path
 
-from justifactu.defines import ROOT_FOLDER
+from justifactu.custom_except import ArgumentInputLocationError
+from justifactu.defines import ROOT_FOLDER, InputLocation
 
 
-def parse_boolean(value: str | bool) -> bool:
-    if isinstance(value, bool):
-        return value
-    normalized_value = str(value).lower().strip()
-    if normalized_value == "True":
-        return True
-    elif normalized_value == "False":
-        return False
-    raise ValueError(
-        "The value "
-        + str(value)
-        + " can not be parsed into a boolean. It should be 'True' or 'False'"
-    )
-
-
-def parse_input_type(value: str) -> str:
-    if value == "sharepoint":
-        return value
-    elif value == "local":
-        return value
+def parse_input_type(value: str) -> InputLocation:
+    if value == InputLocation.SHAREPOINT.value:
+        return InputLocation.SHAREPOINT
+    elif value == InputLocation.LOCAL.value:
+        return InputLocation.LOCAL
     else:
-        raise ValueError(
+        raise ArgumentInputLocationError(
             'The type supplied for input type "' + value + '" is not defined.'
         )
 
@@ -49,7 +51,7 @@ def parse_arguments() -> argparse.Namespace:
         "--location",
         type=parse_input_type,
         required=False,
-        default="sharepoint",
+        default=InputLocation.SHAREPOINT,
         help='Location of the input data. Possible values are: "sharepoint" to download from '
         'sharepoint location and "local" to use the local file system storage and read the input'
         " folder in the repository root folder.",

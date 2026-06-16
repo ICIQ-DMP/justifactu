@@ -126,14 +126,9 @@ Don't forget to give the project a star! Thanks again!
 
 ### Top contributors:
 
-<a href="https://github.com/AleixMT">
-   <img src="https://avatars.githubusercontent.com/AleixMT" width="80px" alt="usuario"/>
+<a href="https://github.com/ICIQ-DMP/justifactu/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=ICIQ-DMP/justifactu" alt="contrib.rocks image" />
 </a>
-
-<a href="https://github.com/DavidRomeroICIQ">
-   <img src="https://avatars.githubusercontent.com/DavidRomeroICIQ" width="80px" alt="usuario"/>
-</a>
-
 
 
 <!-- LICENSE -->

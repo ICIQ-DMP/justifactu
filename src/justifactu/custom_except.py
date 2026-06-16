@@ -14,20 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import datetime
-from enum import Enum
-from pathlib import Path
-
-ROOT_FOLDER: Path = Path(__file__).resolve().parent.parent.parent
-PROJECT_DIR: Path = ROOT_FOLDER  # alias kept for compatibility
-
-DATETIME_FORMAT = "%Y-%m-%d_%H-%M-%S"
-NOW_DATA = datetime.datetime.now()
-NOW = NOW_DATA.strftime(DATETIME_FORMAT)
+"""Domain-specific exception hierarchy for justifactu."""
 
 
-class InputLocation(str, Enum):
-    """Input location argument possible values."""
-
-    SHAREPOINT = "sharepoint"
-    LOCAL = "local"
+class ArgumentInputLocationError(Exception):
+    """Raised when an input location argument or cannot be parsed."""

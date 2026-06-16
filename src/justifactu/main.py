@@ -92,7 +92,7 @@ def main() -> None:
             bills_folder,
             payments_folder,
             bills_plus_payments_folder,
-            delete_processed=False,
+            delete_processed=True,
         )
         logger.info("Finished...")
 

@@ -233,13 +233,8 @@ def configure_logging_from_settings(
 ) -> None:
 
     if user_report_file is None:
-        user_report_file = get_default_log_path()
-    if admin_log_file is None:
-        admin_log_file = get_default_log_path()
-    if supervisor_log_file is None:
-        supervisor_log_file = get_default_log_path()
-    if moved_files_log_file is None:
-        moved_files_log_file = get_default_log_path()
+        user_report_file = user_report_file
+
     if level is None:
         level = LogLevel.get_default_log_level()
 

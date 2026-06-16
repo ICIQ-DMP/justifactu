@@ -144,13 +144,16 @@ def cleanup_processed_files(
     renamed_path = change_file_name(matched_payment, new_name)
 
     if renamed_path is None:
-        log.error(f"Failed to rename processed payment file {matched_payment.name}")
+        log.error(f"Failed to rename processed payment file {matched_payment}")
     else:
         log.info(f"Renamed processed payment file {renamed_path.name}")
 
     if delete_processed:
-        bill_path.unlink()
-        log.info(f"Deleted: {bill_path.name}")
+        try:
+            bill_path.unlink()
+            log.info(f"Deleted: {bill_path.name}")
+        except Exception as e:
+            log.error(f"Failed to delete {bill_path.name}: {e}")
 
 
 def rename_payments(pdf_path: Path) -> None:
@@ -173,7 +176,7 @@ def rename_payments(pdf_path: Path) -> None:
             continue
 
         try:
-            log.info(f"Processing: {entry.name}...")
+            log.info(f"Renaming: {entry.name}...")
 
             sap_id = parse_sap_id_from_bill(entry)
 
@@ -182,9 +185,10 @@ def rename_payments(pdf_path: Path) -> None:
             if not updated_entry:
                 continue
 
-            log.info(f"Processed: {updated_entry.name}")
+            log.info(f"File name changed to: {updated_entry.name}")
 
         except ValueError:
+            print("---DEBUG: Python entered the block---")
             log.warning(f"Skipped {entry.name} due to invalid value")
 
         except Exception as e:
@@ -213,7 +217,7 @@ def merge_bills_and_payments(
         if not expected_name.fullmatch(bill_path.stem):
             move_file(bill_path, qa_folder)
             log.error(
-                f"Failed to merge bill file {bill_path.name}: unexpected name format, moved to QA folder",
+                f"Failed to merge bill file {bill_path}: unexpected name format, moved to QA folder",
                 extra={"qa_report": True},
             )
             continue
@@ -222,7 +226,7 @@ def merge_bills_and_payments(
         matched_payment: Path | None = payment_map.get(bill_numbers)
 
         if not matched_payment:
-            log.error("No matching payment found for bill")
+            log.error(f"No matching payment found for bill {bill_path}")
             continue
 
         output_folder_name = f"{bill_numbers[:4]}_FACTURA+PAGAMENT"
@@ -230,11 +234,13 @@ def merge_bills_and_payments(
         output_folder_path.mkdir(parents=True, exist_ok=True)
 
         output_path = output_folder_path / f"{bill_numbers}_F_P.pdf"
-
-        log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
-        merge_pdfs(bill_path, matched_payment, output_path)
-        successful_payments.add(matched_payment)
-        cleanup_processed_files(bill_path, matched_payment, delete_processed)
+        try:
+            log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
+            merge_pdfs(bill_path, matched_payment, output_path)
+            successful_payments.add(matched_payment)
+            cleanup_processed_files(bill_path, matched_payment, delete_processed)
+        except Exception as e:
+            log.exception(f"Failed to process {bill_path.name}: {e}")
 
     unmatched_payments = set(payment_map.values()) - successful_payments
     for payment in unmatched_payments:

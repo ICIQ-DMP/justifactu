@@ -13,9 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 from justifactu.arguments import process_parse_arguments
 from justifactu.defines import NOW
@@ -27,45 +25,6 @@ from justifactu.logger import (
 from justifactu.pdf import merge_bills_and_payments, rename_payments
 
 logger = get_logger(__name__)
-
-
-def compute_path(partial_path: str, extension: str) -> Path:
-    suffix = 1
-    output_path = Path(partial_path + extension)
-    while output_path.exists():
-        if suffix < 100:
-            str_suffix = "00" + str(suffix)
-        elif suffix < 10:
-            str_suffix = "0" + str(suffix)
-        else:
-            str_suffix = str(suffix)
-        output_path = Path(partial_path + "_" + str_suffix + extension)
-        suffix += 1
-
-    return output_path
-
-
-def datetime_range(begin: datetime, end: datetime) -> list[datetime]:
-    current = datetime(begin.year, begin.month, 1)
-
-    result = []
-    while current <= end:
-        result.append(
-            datetime.strptime(str(current.year * 100 + current.month), "%Y%m")
-        )
-        if current.month == 12:
-            current = datetime(current.year + 1, 1, 1)
-        else:
-            current = datetime(current.year, current.month + 1, 1)
-
-    return result
-
-
-def reverse_dict(d: dict[Any, Any]) -> dict[Any, Any]:
-    r = {}
-    for key in d.keys():
-        r[d[key]] = key
-    return r
 
 
 def main() -> None:

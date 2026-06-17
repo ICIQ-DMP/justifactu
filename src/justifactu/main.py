@@ -22,7 +22,8 @@ from justifactu.logger import (
     configure_logging_from_settings,
     get_logger,
 )
-from justifactu.pdf import merge_bills_and_payments, rename_payments
+from justifactu.bills import merge_bills_and_payments
+from justifactu.pdf import rename_payments
 
 logger = get_logger(__name__)
 

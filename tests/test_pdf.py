@@ -17,11 +17,13 @@
 from unittest.mock import patch
 
 from conftest import create_blank_pdf
-from justifactu.pdf import (
+from justifactu.bills import (
     cleanup_processed_files,
-    extract_sap_number,
-    index_payments,
     merge_bills_and_payments,
+    index_payments,
+)
+from justifactu.pdf import (
+    extract_sap_number,
     merge_pdfs,
     rename_payments,
 )

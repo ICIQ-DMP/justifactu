@@ -17,48 +17,46 @@
 import re
 from pathlib import Path
 
-from pypdf import PdfWriter
+from pypdf import PdfReader, PdfWriter
 
-from justifactu.filesystem import list_dir
-from justifactu.filesystem import move_file
+from justifactu.custom_except import ParseSAPIdException
+
 from justifactu.filesystem import change_file_name
-from justifactu.bills import parse_sap_id_from_bill
 from justifactu.logger import get_logger
+from justifactu.SAP import SAP
 
 log = get_logger(__name__)
 
 
+def parse_sap_id_from_bill(pdf_path: Path) -> str:
+    """Reads a PDF file to extract the SAP id"""
+    query_str = r"Fra\.?\s+(\d{10})"
+    pattern = re.compile(query_str, re.MULTILINE)
+
+    reader = PdfReader(pdf_path)
+
+    for page in reader.pages:
+        text = page.extract_text()
+        if not text:
+            continue
+
+        match = pattern.search(text)
+        if not match:
+            continue
+
+        return match.group(1)
+
+    raise ParseSAPIdException(f"No SAP ID found in {pdf_path}")
+
+
 def extract_sap_number(filename: str) -> str:
     """Extracts the numeric SAP ID from a filename."""
-    return re.sub(
-        r"\D", "", filename
-    )  # TODO: build specialized class SAP that know how to parse this.
+    try:
+        return str(SAP.from_filename(filename))
 
-
-# TODO: this func should go into a specific file, this is not related to pdfs, but to payments instead (bills.pdf ?)
-def index_payments(payments_folder: Path) -> dict[str, Path]:
-    """Scans the payments folder and returns a mapping of SAP numbers to file paths."""
-    payment_map: dict[str, Path] = {}
-
-    for payment_path in payments_folder.rglob("*.pdf"):
-        if not payment_path.is_file():
-            continue
-
-        if payment_path.stem.endswith("_merged"):
-            log.info(f"Skipping {payment_path} because it is already merged")
-            continue
-
-        sap_number = extract_sap_number(payment_path.name)
-
-        if len(sap_number) != 10:
-            log.warning(
-                f"Skipping {payment_path.name}: SAP number has unexpected length ({len(sap_number)} digits)"
-            )
-            continue
-
-        payment_map[sap_number] = payment_path
-
-    return payment_map
+    except ParseSAPIdException as e:
+        log.error(f"Failed to parse SAP ID from {filename}: {e}")
+        raise
 
 
 def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
@@ -70,27 +68,6 @@ def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
     with open(output_path, "wb") as f:
         writer.write(f)
         writer.close()
-
-
-# TODO: this func should go into a specific file, this is not related to pdfs, but to payments instead (bills.pdf ?)
-def cleanup_processed_files(
-    bill_path: Path, matched_payment: Path, delete_processed: bool
-) -> None:
-    """Renames the payment file and optionally deletes the bill file"""
-    new_name = f"{matched_payment.stem}_merged"
-    renamed_path = change_file_name(matched_payment, new_name)
-
-    if renamed_path is None:
-        log.error(f"Failed to rename processed payment file {matched_payment}")
-    else:
-        log.info(f"Renamed processed payment file {renamed_path.name}")
-
-    if delete_processed:
-        try:
-            bill_path.unlink()
-            log.info(f"Deleted: {bill_path.name}")
-        except Exception as e:
-            log.error(f"Failed to delete {bill_path.name}: {e}")
 
 
 def rename_payments(pdf_path: Path) -> None:
@@ -117,7 +94,7 @@ def rename_payments(pdf_path: Path) -> None:
 
             sap_id = parse_sap_id_from_bill(entry)
 
-            updated_entry = change_file_name(entry, sap_id + "-P")
+            updated_entry = change_file_name(entry, f"{sap_id}-P")
 
             if not updated_entry:
                 continue
@@ -125,64 +102,7 @@ def rename_payments(pdf_path: Path) -> None:
             log.info(f"File name changed to: {updated_entry.name}")
 
         except ValueError:
-            print("---DEBUG: Python entered the block---")
             log.warning(f"Skipped {entry.name} due to invalid value")
 
         except Exception as e:
             log.exception(f"Unexpected error processing {entry.name}: {e}")
-
-
-# TODO: this func should go into a specific file, this is not related to pdfs, but to the general process instead
-# (main.py ?)
-def merge_bills_and_payments(
-    bills_folder: Path,
-    payments_folder: Path,
-    merge_folder: Path,
-    delete_processed: bool = False,
-) -> None:
-    """Merges bills and payments and saves them into merge_folder"""
-
-    merge_folder.mkdir(parents=True, exist_ok=True)
-    payment_map = index_payments(payments_folder)
-    successful_payments: set[Path] = set()
-    qa_folder = merge_folder / "QA_ERRORS"
-    expected_name = re.compile(
-        r"F\s\d{10}"
-    )  # TODO: delegate into SAP id class, look at NAF class in justicier
-
-    # Process bills and look for matches
-    for bill_path in list_dir(bills_folder):
-        if not bill_path.is_file() or bill_path.suffix.lower() != ".pdf":
-            continue
-
-        if not expected_name.fullmatch(bill_path.stem):
-            move_file(bill_path, qa_folder)
-            log.error(
-                f"Failed to merge bill file {bill_path}: unexpected name format, moved to QA folder",
-                extra={"qa_report": True},
-            )
-            continue
-
-        bill_numbers = extract_sap_number(bill_path.stem)
-        matched_payment: Path | None = payment_map.get(bill_numbers)
-
-        if not matched_payment:
-            log.error(f"No matching payment found for bill {bill_path}")
-            continue
-        # TODO: This means that bill_numbers[:4] follow a specific format and the regexp can be more specific
-        output_folder_name = f"{bill_numbers[:4]}_FACTURA+PAGAMENT"
-        output_folder_path = merge_folder / output_folder_name
-        output_folder_path.mkdir(parents=True, exist_ok=True)
-
-        output_path = output_folder_path / f"{bill_numbers}_F_P.pdf"
-        try:
-            log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
-            merge_pdfs(bill_path, matched_payment, output_path)
-            successful_payments.add(matched_payment)
-            cleanup_processed_files(bill_path, matched_payment, delete_processed)
-        except Exception as e:
-            log.exception(f"Failed to process {bill_path.name}: {e}")
-
-    unmatched_payments = set(payment_map.values()) - successful_payments
-    for payment in unmatched_payments:
-        log.error(f"No matching payment found for {payment.name}")

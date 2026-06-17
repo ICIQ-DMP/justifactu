@@ -233,7 +233,7 @@ def configure_logging_from_settings(
 ) -> None:
 
     if user_report_file is None:
-        user_report_file = user_report_file
+        user_report_file = get_user_log_path()
 
     if level is None:
         level = LogLevel.get_default_log_level()

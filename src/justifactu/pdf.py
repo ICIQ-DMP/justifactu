@@ -15,84 +15,17 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import re
-import shutil
 from pathlib import Path
 
-from pypdf import PdfReader, PdfWriter
+from pypdf import PdfWriter
 
 from justifactu.filesystem import list_dir
+from justifactu.filesystem import move_file
+from justifactu.filesystem import change_file_name
+from justifactu.bills import parse_sap_id_from_bill
 from justifactu.logger import get_logger
 
 log = get_logger(__name__)
-
-
-def copy_file(origin_path: Path, target_path: Path) -> None:
-    """Copies a file to another location"""
-    # Check to avoid overwriting a file.
-    dest_file = target_path / origin_path.name if target_path.is_dir() else target_path
-
-    if dest_file.exists():
-        raise FileExistsError(f"Destination file already exists: {dest_file}")
-
-    dest_file.parent.mkdir(parents=True, exist_ok=True)
-
-    shutil.copy(origin_path, dest_file)
-
-    log.info(f"Copied: {origin_path} into {target_path}")
-
-
-def move_file(origin_path: Path, target_path: Path) -> None:
-    """Moves a file to another location"""
-    target_path.mkdir(parents=True, exist_ok=True)
-    dest_file = target_path / origin_path.name
-
-    try:
-        shutil.move(origin_path, dest_file)
-        log.info(f"Moved: {origin_path} into {target_path}")
-
-    except FileExistsError:
-        log.warning(f"Destination file already exists: {dest_file}")
-
-    except Exception as e:
-        log.exception(f"Unexpected error: {e}")
-
-
-def change_file_name(file: Path, new_name: str) -> Path | None:
-    """Changes the name of a file"""
-    if not file.exists():
-        log.warning(f"File not found at {file}")
-        return None
-
-    new_path = file.with_stem(new_name)
-
-    if new_path.exists():
-        log.warning(f"A file named {new_path.name} already exists.")
-        return None
-
-    file.rename(new_path)
-    return new_path
-
-
-# TODO: this func should go into a specific file, this is not related to pdfs, but to bills instead (bills.pdf ?)
-def parse_sap_id_from_bill(pdf_path: Path) -> str:
-    """Reads a PDF file to extract the SAP id"""
-    query_str = r"Fra\.?\s+(\d{10})"
-    pattern = re.compile(query_str, re.MULTILINE)
-
-    reader = PdfReader(pdf_path)
-
-    for page in reader.pages:
-        text = page.extract_text()
-        if not text:
-            continue
-
-        match = pattern.search(text)
-        if not match:
-            continue
-
-        return match.group(1)
-
-    raise ValueError(f"No SAP ID found in {pdf_path}")
 
 
 def extract_sap_number(filename: str) -> str:
@@ -213,7 +146,9 @@ def merge_bills_and_payments(
     payment_map = index_payments(payments_folder)
     successful_payments: set[Path] = set()
     qa_folder = merge_folder / "QA_ERRORS"
-    expected_name = re.compile(r"F\s\d{10}")  # TODO: delegate into SAP class
+    expected_name = re.compile(
+        r"F\s\d{10}"
+    )  # TODO: delegate into SAP id class, look at NAF class in justicier
 
     # Process bills and look for matches
     for bill_path in list_dir(bills_folder):

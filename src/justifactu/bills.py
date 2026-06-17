@@ -14,12 +14,29 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""Domain-specific exception hierarchy for justifactu."""
+import re
+from pathlib import Path
+
+from pypdf import PdfReader
+from justifactu.custom_except import ParseSAPIdException
 
 
-class ArgumentInputLocationError(Exception):
-    """Raised when an input location argument or cannot be parsed."""
+def parse_sap_id_from_bill(pdf_path: Path) -> str:
+    """Reads a PDF file to extract the SAP id"""
+    query_str = r"Fra\.?\s+(\d{10})"
+    pattern = re.compile(query_str, re.MULTILINE)
 
+    reader = PdfReader(pdf_path)
 
-class ParseSAPIdException(Exception):
-    """Raised when a SAP id cannot be parsed from a file."""
+    for page in reader.pages:
+        text = page.extract_text()
+        if not text:
+            continue
+
+        match = pattern.search(text)
+        if not match:
+            continue
+
+        return match.group(1)
+
+    raise ParseSAPIdException(f"No SAP ID found in {pdf_path}")

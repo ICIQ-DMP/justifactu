@@ -14,125 +14,19 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# TODO: move functions regarding file movement into filesystem.py or others and do the corresponding for test functions
-from unittest.mock import MagicMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from conftest import create_blank_pdf
 from justifactu.pdf import (
-    change_file_name,
     cleanup_processed_files,
-    copy_file,
     extract_sap_number,
     index_payments,
     merge_bills_and_payments,
     merge_pdfs,
-    move_file,
-    parse_sap_id_from_bill,
     rename_payments,
 )
 
 SAP_ID = "1234567890"
-
-
-# ── copy_file ─────────────────────────────────────────────────────────────────
-
-
-def test_copy_file_to_new_path(tmp_path):
-    src = tmp_path / "src.pdf"
-    src.touch()
-    dst = tmp_path / "dst.pdf"
-
-    copy_file(src, dst)
-
-    assert dst.exists()
-    assert src.exists()  # original is preserved
-
-
-def test_copy_file_into_directory(tmp_path):
-    src = tmp_path / "src.pdf"
-    src.touch()
-    dest_dir = tmp_path / "subdir"
-    dest_dir.mkdir()
-
-    copy_file(src, dest_dir)
-
-    assert (dest_dir / "src.pdf").exists()
-
-
-def test_copy_file_destination_exists_raises(tmp_path):
-    src = tmp_path / "src.pdf"
-    src.touch()
-    dst = tmp_path / "dst.pdf"
-    dst.touch()
-
-    with pytest.raises(FileExistsError):
-        copy_file(src, dst)
-
-
-def test_copy_file_creates_parent_directories(tmp_path):
-    src = tmp_path / "src.pdf"
-    src.touch()
-    dst = tmp_path / "a" / "b" / "dst.pdf"
-
-    copy_file(src, dst)
-
-    assert dst.exists()
-
-
-# ── move_file ─────────────────────────────────────────────────────────────────
-
-
-def test_move_file_success(tmp_path):
-    src = tmp_path / "src.pdf"
-    src.touch()
-    dest_dir = tmp_path / "subdir"
-
-    move_file(src, dest_dir)
-
-    assert (dest_dir / "src.pdf").exists()
-    assert not src.exists()
-
-
-def test_move_file_creates_destination_directory(tmp_path):
-    src = tmp_path / "src.pdf"
-    src.touch()
-    dest_dir = tmp_path / "new" / "nested"
-
-    move_file(src, dest_dir)
-
-    assert (dest_dir / "src.pdf").exists()
-
-
-# ── change_file_name ──────────────────────────────────────────────────────────
-
-
-def test_change_file_name_success(tmp_path):
-    original = tmp_path / "old_name.pdf"
-    original.touch()
-
-    result = change_file_name(original, "new_name")
-
-    assert result == tmp_path / "new_name.pdf"
-    assert result.exists()
-    assert not original.exists()
-
-
-def test_change_file_name_nonexistent_returns_none(tmp_path):
-    missing = tmp_path / "missing.pdf"
-    result = change_file_name(missing, "anything")
-    assert result is None
-
-
-def test_change_file_name_collision_returns_none(tmp_path):
-    original = tmp_path / "original.pdf"
-    original.touch()
-    conflict = tmp_path / "conflict.pdf"
-    conflict.touch()
-
-    result = change_file_name(original, "conflict")
-    assert result is None
 
 
 # ── extract_sap_number ────────────────────────────────────────────────────────
@@ -199,70 +93,6 @@ def test_index_payments_empty_folder(tmp_path):
     result = index_payments(payments_dir)
 
     assert result == {}
-
-
-# ── parse_sap_id_from_bill ────────────────────────────────────────────────────
-
-
-def test_parse_sap_id_from_bill_found(tmp_path):
-    pdf_path = tmp_path / "bill.pdf"
-    pdf_path.touch()
-
-    mock_page = MagicMock()
-    mock_page.extract_text.return_value = f"Fra. {SAP_ID} some other text"
-    mock_reader = MagicMock()
-    mock_reader.pages = [mock_page]
-
-    with patch("justifactu.pdf.PdfReader", return_value=mock_reader):
-        result = parse_sap_id_from_bill(pdf_path)
-
-    assert result == SAP_ID
-
-
-def test_parse_sap_id_from_bill_found_without_dot(tmp_path):
-    pdf_path = tmp_path / "bill.pdf"
-    pdf_path.touch()
-
-    mock_page = MagicMock()
-    mock_page.extract_text.return_value = f"Fra {SAP_ID}"
-    mock_reader = MagicMock()
-    mock_reader.pages = [mock_page]
-
-    with patch("justifactu.pdf.PdfReader", return_value=mock_reader):
-        result = parse_sap_id_from_bill(pdf_path)
-
-    assert result == SAP_ID
-
-
-def test_parse_sap_id_from_bill_not_found_raises(tmp_path):
-    pdf_path = tmp_path / "bill.pdf"
-    pdf_path.touch()
-
-    mock_page = MagicMock()
-    mock_page.extract_text.return_value = "Some unrelated text"
-    mock_reader = MagicMock()
-    mock_reader.pages = [mock_page]
-
-    with patch("justifactu.pdf.PdfReader", return_value=mock_reader):
-        with pytest.raises(ValueError, match="No SAP ID found"):
-            parse_sap_id_from_bill(pdf_path)
-
-
-def test_parse_sap_id_from_bill_skips_empty_pages(tmp_path):
-    pdf_path = tmp_path / "bill.pdf"
-    pdf_path.touch()
-
-    empty_page = MagicMock()
-    empty_page.extract_text.return_value = None
-    good_page = MagicMock()
-    good_page.extract_text.return_value = f"Fra. {SAP_ID}"
-    mock_reader = MagicMock()
-    mock_reader.pages = [empty_page, good_page]
-
-    with patch("justifactu.pdf.PdfReader", return_value=mock_reader):
-        result = parse_sap_id_from_bill(pdf_path)
-
-    assert result == SAP_ID
 
 
 # ── merge_pdfs ────────────────────────────────────────────────────────────────

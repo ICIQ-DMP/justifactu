@@ -13,13 +13,3 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-"""Domain-specific exception hierarchy for justifactu."""
-
-
-class ArgumentInputLocationError(Exception):
-    """Raised when an input location argument or cannot be parsed."""
-
-
-class ParseSAPIdException(Exception):
-    """Raised when a SAP id cannot be parsed from a file."""

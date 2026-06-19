@@ -19,11 +19,15 @@ from pathlib import Path
 
 from pypdf import PdfReader, PdfWriter
 
-from justifactu.custom_except import ParseSAPIdException
+from .custom_except import (
+    ParseSAPIdException,
+    SkippedPdfRenamingInvalidSapId,
+    UnexpectedRenamingError,
+)
 
-from justifactu.filesystem import change_file_name
-from justifactu.logger import get_logger
-from justifactu.SAP import SAP
+from .filesystem import change_file_name
+from .logger import get_logger
+from .SAP import SAP
 
 log = get_logger(__name__)
 
@@ -101,8 +105,8 @@ def rename_payments(pdf_path: Path) -> None:
 
             log.info(f"File name changed to: {updated_entry.name}")
 
-        except ValueError:
+        except SkippedPdfRenamingInvalidSapId:
             log.warning(f"Skipped {entry.name} due to invalid value")
 
-        except Exception as e:
+        except UnexpectedRenamingError as e:
             log.exception(f"Unexpected error processing {entry.name}: {e}")

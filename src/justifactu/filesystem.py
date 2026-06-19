@@ -87,3 +87,74 @@ def change_file_name(file: Path, new_name: str) -> Path | None:
 
     file.rename(new_path)
     return new_path
+
+
+def read_env_var(var_name: str) -> str:
+    """Reads an environment variable.
+
+    Args:
+        var_name (str): Name of the environment variable.
+
+    Returns:
+        str: The value of the environment variable if valid.
+
+    Raises:
+        KeyError: If the environment variable does not exist.
+        ValueError: If the environment variable is empty or contains only whitespace.
+    """
+    if var_name not in os.environ:
+        raise KeyError(f"The environment variable '{var_name}' does not exist.")
+
+    value = os.environ[var_name]
+
+    if not value:
+        raise ValueError(f"The environment variable '{var_name}' is empty.")
+
+    return value
+
+
+def read_file_content(file_path: Path) -> str:
+    """Read a file and return its non-empty content.
+
+    Args:
+        file_path: Path to the file.
+
+    Returns:
+        The file content as a string.
+
+    Raises:
+        ValueError: If the file exists but is empty.
+        FileNotFoundError: If the file does not exist.
+        PermissionError: If the file cannot be read.
+    """
+    content = read_file(file_path)
+    if not content:
+        raise ValueError(f"The file '{file_path}' is empty.")
+    return content
+
+
+def read_file(file_path: Path) -> str:
+    """Reads a file and returns its content.
+
+    Args:
+        file_path (Path): Path to the file.
+
+    Returns:
+        str: The content of the file.
+
+    Raises:
+        FileNotFoundError: If the file does not exist.
+        PermissionError: If the file cannot be read due to permission issues.
+    """
+    if not file_path.exists():
+        raise FileNotFoundError(f"The file '{file_path}' does not exist.")
+
+    if not os.access(file_path, os.R_OK):
+        raise PermissionError(
+            f"The file '{file_path}' cannot be read. Check permissions."
+        )
+
+    with open(file_path, "r") as file:
+        content = file.read()
+
+    return content

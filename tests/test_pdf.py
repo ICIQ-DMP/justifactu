@@ -34,7 +34,6 @@ SAP_ID = "1234567890"
 # ── extract_sap_number ────────────────────────────────────────────────────────
 
 
-# TODO: create SAP class specialized in reading these numbers
 def test_extract_sap_number_from_payment_filename():
     assert extract_sap_number("1234567890-P") == "1234567890"
 

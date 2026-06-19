@@ -23,3 +23,31 @@ class ArgumentInputLocationError(Exception):
 
 class ParseSAPIdException(Exception):
     """Raised when a SAP id cannot be parsed from a file."""
+
+
+class SecretCouldNotBeReadFromAnySourceError(Exception):
+    """Raised when a secret cannot be read from any source."""
+
+
+class MergingBillWithPaymentError(Exception):
+    """Raised when merging bills with payment cannot be made."""
+
+
+class FileDeletionError(Exception):
+    """Raised when a file cannot be deleted."""
+
+
+class MainCriticalError(Exception):
+    """Raised when critical error occurs on main procedure."""
+
+
+class SkippedPdfRenamingInvalidSapId(Exception):
+    """Raised when pdf is skipped in name change due to invalid SAP id value."""
+
+
+class UnexpectedRenamingError(Exception):
+    """Raised when renaming failed due to unexpected circumstances."""
+
+
+class VaultSecretEmpty(Exception):
+    """Raised when secret is empty."""

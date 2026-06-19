@@ -31,3 +31,19 @@ class InputLocation(str, Enum):
 
     SHAREPOINT = "sharepoint"
     LOCAL = "local"
+
+
+class OutputLocation(str, Enum):
+    """Output location argument possible values."""
+
+
+class SecretNames(str, Enum):
+    """Available secret names."""
+
+    SHAREPOINT_DOMAIN = "SHAREPOINT_DOMAIN"
+    SITE_NAME = "SITE_NAME"
+    SMTP_OWNER_EMAIL = "SMTP_OWNER_EMAIL"
+    SMTP_USERNAME = "SMTP_USERNAME"
+    SMTP_PASSWORD = "SMTP_PASSWORD"
+    SMTP_SERVER = "SMTP_SERVER"
+    SMTP_PORT = "SMTP_PORT"

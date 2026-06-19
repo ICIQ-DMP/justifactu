@@ -17,11 +17,12 @@
 from pathlib import Path
 
 
-from justifactu.logger import get_logger
-from justifactu.filesystem import list_dir, move_file, change_file_name
-from justifactu.SAP import SAP
-from justifactu.pdf import merge_pdfs
-from justifactu.payments import index_payments
+from .logger import get_logger
+from .filesystem import list_dir, move_file, change_file_name
+from .SAP import SAP
+from .pdf import merge_pdfs
+from .payments import index_payments
+from .custom_except import MergingBillWithPaymentError, FileDeletionError
 
 log = get_logger(__name__)
 
@@ -69,7 +70,7 @@ def merge_bills_and_payments(
             merge_pdfs(bill_path, matched_payment, output_path)
             successful_payments.add(matched_payment)
             cleanup_processed_files(bill_path, matched_payment, delete_processed)
-        except Exception as e:
+        except MergingBillWithPaymentError as e:
             log.exception(f"Failed to process {bill_path.name}: {e}")
 
     unmatched_payments = set(payment_map.values()) - successful_payments
@@ -93,5 +94,5 @@ def cleanup_processed_files(
         try:
             bill_path.unlink()
             log.info(f"Deleted: {bill_path.name}")
-        except Exception as e:
-            log.error(f"Failed to delete {bill_path.name}: {e}")
+        except FileDeletionError as e:
+            log.exception(f"Failed to delete {bill_path.name}: {e}")

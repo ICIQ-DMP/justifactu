@@ -15,15 +15,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from pathlib import Path
 
-from justifactu.arguments import process_parse_arguments
-from justifactu.defines import NOW
-from justifactu.logger import (
+from .arguments import process_parse_arguments
+from .defines import NOW
+from .logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
     get_logger,
 )
-from justifactu.bills import merge_bills_and_payments
-from justifactu.pdf import rename_payments
+from .bills import merge_bills_and_payments
+from .pdf import rename_payments
+from .custom_except import MainCriticalError
 
 logger = get_logger(__name__)
 
@@ -56,7 +57,7 @@ def main() -> None:
         )
         logger.info("Finished...")
 
-    except Exception as e:
+    except MainCriticalError as e:
         logger.critical(e)
 
 

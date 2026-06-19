@@ -19,7 +19,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, Any, cast
 from rich.logging import RichHandler
-from justifactu.defines import ROOT_FOLDER, NOW
+from .defines import ROOT_FOLDER, NOW
 
 # ---- extend the logging module with TRACE
 DATE_FORMAT = "%d/%m/%Y"

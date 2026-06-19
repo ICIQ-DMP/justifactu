@@ -17,6 +17,7 @@
 from unittest.mock import patch
 
 from conftest import create_blank_pdf
+from justifactu.defines import FileSuffix, FolderName
 from justifactu.bills import (
     cleanup_processed_files,
     merge_bills_and_payments,
@@ -138,7 +139,7 @@ def test_cleanup_processed_files_renames_payment(tmp_path):
 
     cleanup_processed_files(bill, payment, delete_processed=False)
 
-    assert (tmp_path / f"{SAP_ID}-P_merged.pdf").exists()
+    assert (tmp_path / f"{SAP_ID}-P{FileSuffix.PROCESSED_PAYMENT}.pdf").exists()
     assert bill.exists()  # not deleted when delete_processed=False
 
 
@@ -212,8 +213,10 @@ def test_merge_bills_and_payments_success(billing_dirs):
 
     merge_bills_and_payments(bills_dir, payments_dir, output_dir)
 
-    expected_subfolder = output_dir / f"{SAP_ID[:4]}_FACTURA+PAGAMENT"
-    expected_output = expected_subfolder / f"{SAP_ID}_F_P.pdf"
+    expected_subfolder = output_dir / f"{SAP_ID[:4]}{FolderName.YEAR_FOLDER_SUFFIX}"
+    expected_output = (
+        expected_subfolder / f"{SAP_ID}{FileSuffix.MERGED_BILL_PAYMENT}.pdf"
+    )
     assert expected_output.exists()
 
 
@@ -225,7 +228,7 @@ def test_merge_bills_and_payments_invalid_bill_format_moved_to_qa(billing_dirs):
 
     merge_bills_and_payments(bills_dir, payments_dir, output_dir)
 
-    qa_folder = output_dir / "QA_ERRORS"
+    qa_folder = output_dir / FolderName.QA_ERRORS
     assert (qa_folder / "INVALID_NAME.pdf").exists()
     assert not bad_bill.exists()
 

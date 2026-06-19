@@ -37,6 +37,23 @@ class OutputLocation(str, Enum):
     """Output location argument possible values."""
 
 
+class FolderName(str, Enum):
+    """Named folder paths used across the pipeline."""
+
+    BILLS_INPUT = "FACTURES"
+    PAYMENTS_INPUT = "Remeses"
+    MERGED_OUTPUT = "FACTURES+PAGAMENTS"
+    QA_ERRORS = "QA_ERRORS"
+    YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
+
+
+class FileSuffix(str, Enum):
+    """Named file suffixes used across the pipeline."""
+
+    MERGED_BILL_PAYMENT = "_F_P"
+    PROCESSED_PAYMENT = "_merged"
+
+
 class SecretNames(str, Enum):
     """Available secret names."""
 

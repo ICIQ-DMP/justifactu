@@ -19,7 +19,7 @@ import shutil
 from pathlib import Path
 from typing import List
 
-from justifactu.logger import get_logger
+from .logger import get_logger
 
 log = get_logger(__name__)
 

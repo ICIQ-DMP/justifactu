@@ -25,6 +25,7 @@ from .logger import (
 from .bills import merge_bills_and_payments
 from .pdf import rename_payments
 from .custom_except import MainCriticalError
+from .defines import FolderName
 
 logger = get_logger(__name__)
 
@@ -41,9 +42,11 @@ def main() -> None:
         input_folder = Path(args.input_location)
     else:
         input_folder = Path("./service/onedrive/data/justifactu/_input")
-    bills_folder = input_folder / "FACTURES"
-    payments_folder = input_folder / "Remeses"
-    bills_plus_payments_folder = input_folder.parent / "_output" / "FACTURES+PAGAMENTS"
+    bills_folder = input_folder / FolderName.BILLS_INPUT
+    payments_folder = input_folder / FolderName.PAYMENTS_INPUT
+    bills_plus_payments_folder = (
+        input_folder.parent / "_output" / FolderName.MERGED_OUTPUT
+    )
 
     logger.info("Starting...")
 

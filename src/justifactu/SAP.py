@@ -15,8 +15,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import re
 
-from justifactu.custom_except import ParseSAPIdException
-from justifactu.logger import get_logger
+from .custom_except import ParseSAPIdException
+from .logger import get_logger
 
 log = get_logger(__name__)
 

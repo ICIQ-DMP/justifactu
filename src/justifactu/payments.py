@@ -16,9 +16,10 @@
 
 from pathlib import Path
 
-from justifactu.logger import get_logger
-from justifactu.custom_except import ParseSAPIdException
-from justifactu.pdf import extract_sap_number
+from .logger import get_logger
+from .custom_except import ParseSAPIdException
+from .pdf import extract_sap_number
+from .defines import FileSuffix
 
 log = get_logger(__name__)
 
@@ -31,7 +32,7 @@ def index_payments(payments_folder: Path) -> dict[str, Path]:
         if not payment_path.is_file():
             continue
 
-        if payment_path.stem.endswith("_merged"):
+        if payment_path.stem.endswith(FileSuffix.PROCESSED_PAYMENT):
             log.info(f"Skipping {payment_path} because it is already merged")
             continue
 

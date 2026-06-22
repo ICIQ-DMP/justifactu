@@ -36,9 +36,9 @@ def parse_input_type(value: str) -> InputLocation:
 def parse_input_location(value: str) -> Path:
     path = Path(value)
     if not path.exists():
-        raise ValueError(f"Path {value} does not exist")
+        raise ArgumentInputLocationError(f"Path {value} does not exist")
     if not path.is_dir():
-        raise ValueError(f"Path {value} is not a directory")
+        raise ArgumentInputLocationError(f"Path {value} is not a directory")
     return path
 
 

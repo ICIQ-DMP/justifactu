@@ -33,10 +33,6 @@ class InputLocation(str, Enum):
     LOCAL = "local"
 
 
-class OutputLocation(str, Enum):
-    """Output location argument possible values."""
-
-
 class FolderName(str, Enum):
     """Named folder paths used across the pipeline."""
 

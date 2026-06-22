@@ -20,7 +20,7 @@ import smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
 
-from .data import unparse_date
+from .date import unparse_date
 from .defines import SecretNames
 from .logger import get_logger
 from .secret import read_secret
@@ -173,7 +173,7 @@ def mail_process(
         end: Date of the end of the justification request.
         owner_email: Email of the person who owns Justicier.
     """
-    subject = f'Justicier - La petició "{title}" amb ID {request} ha estat completada amb èxit'
+    subject = f'Justifactu - La petició "{title}" amb ID {request} ha estat completada amb èxit'
     body = build_result_mail_body(
         result_link=result_link,
         log_link=log_link,

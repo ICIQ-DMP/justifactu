@@ -46,16 +46,12 @@ def test_parse_input_location_valid_dir(tmp_path):
 
 def test_parse_input_location_nonexistent_raises(tmp_path):
     nonexistent = tmp_path / "does_not_exist"
-    with pytest.raises(
-        ValueError, match="does not exist"
-    ):  # TODO: add custom exception
+    with pytest.raises(ArgumentInputLocationError, match="does not exist"):
         parse_input_location(str(nonexistent))
 
 
 def test_parse_input_location_file_raises(tmp_path):
     file_path = tmp_path / "a_file.txt"
     file_path.touch()
-    with pytest.raises(
-        ValueError, match="not a directory"
-    ):  # TODO: add custom exception
+    with pytest.raises(ArgumentInputLocationError, match="not a directory"):
         parse_input_location(str(file_path))

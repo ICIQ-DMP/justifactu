@@ -23,12 +23,13 @@ import requests
 import urllib3
 from pathlib import Path
 
-from .defines import SecretNames
+from .defines import SecretNames, ROOT_FOLDER
 from .logger import get_logger
 from .custom_except import VaultSecretEmpty
 
 _VAULT_BASE_PATH = "secret/data/justicier/runtime"
 
+# TODO create defines from values in secret_map in enum SecretNames
 # Maps app-level secret names to (vault subpath, vault field key)
 _SECRET_MAP = {
     # sharepoint
@@ -52,8 +53,6 @@ _SECRET_MAP = {
 }
 
 
-_PROJECT_ROOT: Path = Path(__file__).resolve().parent.parent
-
 log = get_logger(__name__)
 
 
@@ -74,7 +73,7 @@ def _read_credential(name: str) -> str:
     Raises:
         KeyError: If the credential is not found in any source.
     """
-    for path in (Path("/run/secrets") / name, _PROJECT_ROOT / "secrets" / name):
+    for path in (Path("/run/secrets") / name, ROOT_FOLDER / "secrets" / name):
         if path.is_file():
             with open(path) as f:
                 value = f.read().strip()

@@ -47,7 +47,8 @@ def read_secret(secret_name: str) -> str:
     for source in sources:
         try:
             return source()
-        except Exception:
+        except Exception as e:
+            log.trace(f"Failed to read secret {str(e)}")
             continue
 
     log.error(f"Could not read {secret_name} from any source")

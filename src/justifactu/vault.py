@@ -27,7 +27,7 @@ from .defines import SecretNames, ROOT_FOLDER
 from .logger import get_logger
 from .custom_except import VaultSecretEmpty
 
-_VAULT_BASE_PATH = "secret/data/justicier/runtime"
+_VAULT_BASE_PATH = "secret/data/justifactu/runtime"
 
 # TODO create defines from values in secret_map in enum SecretNames
 # Maps app-level secret names to (vault subpath, vault field key)
@@ -46,9 +46,9 @@ _SECRET_MAP = {
     # smtp
     "SMTP_PASSWORD": ("smtp", "password"),
     "SMTP_PORT": ("smtp", "port"),
-    "SMTP_SERVER": ("smtp", "server"),
+    "SMTP_SERVER": ("smtp", "host"),
     "SMTP_USERNAME": ("smtp", "username"),
-    "SMTP_ADMIN_EMAIL": ("smtp", "admin_email"),
+    SecretNames.SMTP_DEVELOPER_EMAIL.value: ("smtp", "developer_email"),
     SecretNames.SMTP_OWNER_EMAIL.value: ("smtp", "owner_email"),
 }
 

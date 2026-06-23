@@ -53,10 +53,43 @@ class FileSuffix(str, Enum):
 class SecretNames(str, Enum):
     """Available secret names."""
 
+    # sharepoint
+    CLIENT_ID = "CLIENT_ID"
+    CLIENT_NAME = "CLIENT_NAME"
+    CLIENT_SECRET = "CLIENT_SECRET"
+    OBJECT_ID = "OBJECT_ID"
     SHAREPOINT_DOMAIN = "SHAREPOINT_DOMAIN"
+    DRIVE_ID = "DRIVE_ID"
+    SHAREPOINT_LIST_GUID = "SHAREPOINT_LIST_GUID"
+    SHAREPOINT_LIST_NAME = "SHAREPOINT_LIST_NAME"
     SITE_NAME = "SITE_NAME"
-    SMTP_OWNER_EMAIL = "SMTP_OWNER_EMAIL"
-    SMTP_USERNAME = "SMTP_USERNAME"
+    TENANT_ID = "TENANT_ID"
+
+    # smtp
     SMTP_PASSWORD = "SMTP_PASSWORD"
-    SMTP_SERVER = "SMTP_SERVER"
     SMTP_PORT = "SMTP_PORT"
+    SMTP_SERVER = "SMTP_SERVER"
+    SMTP_USERNAME = "SMTP_USERNAME"
+    SMTP_ADMIN_EMAIL = "SMTP_ADMIN_EMAIL"
+    SMTP_OWNER_EMAIL = "SMTP_OWNER_EMAIL"
+
+
+class SharepointListFields(Enum):
+    """Maps semantic Python names to the internal SharePoint field names used by the Graph API."""
+
+    ID = "id"
+    REQUEST_TITLE = "Title"
+    NAF = "NAF"
+    TARGET_NAME = "Nomdelapersona"
+    TARGET_EMAIL = "PersonaEmail"
+    NIF = "DNI"
+    BEGIN = "DataInici"
+    END = "Datafinal"
+    AUTHOR_NAME = "Sol_x00b7_licitant"
+    AUTHOR_EMAIL = "SolicitantEmail"
+    MERGE_SALARY_BANKPROOF = "Fusi_x00f3_NominaiJustificantBan"
+    MERGE_RESULTS = "juntarpdfs"
+    MERGE_RLC_RNT = "Fusi_x00f3_RLCRNT"
+    WORKFLOW_STATE = "Estatworkflow"
+    RESULT = "Resultat"
+    ERROR_MESSAGE = "Missatge_x0020_error"

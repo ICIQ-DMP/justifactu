@@ -15,17 +15,18 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from pathlib import Path
 
-from .arguments import process_parse_arguments
-from .defines import NOW
-from .logger import (
+from justifactu.arguments import process_parse_arguments
+from justifactu.defines import NOW
+from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
     get_logger,
 )
-from .bills import merge_bills_and_payments
-from .pdf import rename_payments
-from .custom_except import MainCriticalError
-from .defines import FolderName
+from justifactu.bills import merge_bills_and_payments
+from justifactu.pdf import rename_payments
+from justifactu.custom_except import MainCriticalError
+from justifactu.defines import FolderName
+from justifactu.mail import main as mail_main
 
 logger = get_logger(__name__)
 
@@ -35,6 +36,8 @@ def main() -> None:
     configure_logging_from_settings(
         moved_files_log_file=ADMIN_LOG_FOLDER / (NOW + "_qa_report.log"),
     )
+
+    mail_main()
 
     args = process_parse_arguments()
 

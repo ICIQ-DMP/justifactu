@@ -27,28 +27,27 @@ from .defines import SecretNames, ROOT_FOLDER
 from .logger import get_logger
 from .custom_except import VaultSecretEmpty
 
-_VAULT_BASE_PATH = "secret/data/justicier/runtime"
+_VAULT_BASE_PATH = "secret/data/justifactu/runtime"
 
-# TODO create defines from values in secret_map in enum SecretNames
 # Maps app-level secret names to (vault subpath, vault field key)
 _SECRET_MAP = {
     # sharepoint
-    "CLIENT_ID": ("sharepoint", "client_id"),
-    "CLIENT_NAME": ("sharepoint", "client_name"),
-    "CLIENT_SECRET": ("sharepoint", "client_secret"),
-    "OBJECT_ID": ("sharepoint", "object_id"),
+    SecretNames.CLIENT_ID.value: ("sharepoint", "client_id"),
+    SecretNames.CLIENT_NAME.value: ("sharepoint", "client_name"),
+    SecretNames.CLIENT_SECRET.value: ("sharepoint", "client_secret"),
+    SecretNames.OBJECT_ID.value: ("sharepoint", "object_id"),
     SecretNames.SHAREPOINT_DOMAIN.value: ("sharepoint", "domain"),
-    "DRIVE_ID": ("sharepoint", "drive_id"),
-    "SHAREPOINT_LIST_GUID": ("sharepoint", "list_guid"),
-    "SHAREPOINT_LIST_NAME": ("sharepoint", "list_name"),
+    SecretNames.DRIVE_ID.value: ("sharepoint", "drive_id"),
+    SecretNames.SHAREPOINT_LIST_GUID.value: ("sharepoint", "list_guid"),
+    SecretNames.SHAREPOINT_LIST_NAME.value: ("sharepoint", "list_name"),
     SecretNames.SITE_NAME.value: ("sharepoint", "site_name"),
-    "TENANT_ID": ("sharepoint", "tenant_id"),
+    SecretNames.TENANT_ID.value: ("sharepoint", "tenant_id"),
     # smtp
-    "SMTP_PASSWORD": ("smtp", "password"),
-    "SMTP_PORT": ("smtp", "port"),
-    "SMTP_SERVER": ("smtp", "server"),
-    "SMTP_USERNAME": ("smtp", "username"),
-    "SMTP_ADMIN_EMAIL": ("smtp", "admin_email"),
+    SecretNames.SMTP_PASSWORD.value: ("smtp", "password"),
+    SecretNames.SMTP_PORT.value: ("smtp", "port"),
+    SecretNames.SMTP_SERVER.value: ("smtp", "server"),
+    SecretNames.SMTP_USERNAME.value: ("smtp", "username"),
+    SecretNames.SMTP_ADMIN_EMAIL.value: ("smtp", "admin_email"),
     SecretNames.SMTP_OWNER_EMAIL.value: ("smtp", "owner_email"),
 }
 

@@ -51,3 +51,7 @@ class UnexpectedRenamingError(Exception):
 
 class VaultSecretEmpty(Exception):
     """Raised when secret is empty."""
+
+
+class BadSharepointListUpdateRequestError(Exception):
+    """Raised when a sharepoint list update request cannot be made."""

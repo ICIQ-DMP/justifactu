@@ -14,8 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import patch, MagicMock
 from datetime import datetime
+from unittest.mock import patch, MagicMock
 
 from justifactu.mail import (
     send_mail,
@@ -24,6 +24,8 @@ from justifactu.mail import (
     send_mail_authenticated,
     mail_process,
 )
+from justifactu.secret import read_secret
+from justifactu.defines import SecretNames
 
 # ── send_mail ─────────────────────────────────────────────────────────────────
 
@@ -175,3 +177,11 @@ def test_mail_process(mock_log, mock_build_body, mock_send_auth):
     )
 
     mock_log.info.assert_called_once_with("Email sent. Process complete.")
+
+
+def test_send_mail_authenticated_real():
+    send_mail_authenticated(
+        read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
+        "Prova mailing",
+        "Cos de la prova de mailing",
+    )

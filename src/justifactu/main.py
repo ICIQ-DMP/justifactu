@@ -26,7 +26,6 @@ from justifactu.bills import merge_bills_and_payments
 from justifactu.pdf import rename_payments
 from justifactu.custom_except import MainCriticalError
 from justifactu.defines import FolderName
-from justifactu.mail import main as mail_main
 
 logger = get_logger(__name__)
 
@@ -36,8 +35,6 @@ def main() -> None:
     configure_logging_from_settings(
         moved_files_log_file=ADMIN_LOG_FOLDER / (NOW + "_qa_report.log"),
     )
-
-    mail_main()
 
     args = process_parse_arguments()
 

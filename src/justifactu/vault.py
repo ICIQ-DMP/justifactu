@@ -29,6 +29,7 @@ from .custom_except import VaultSecretEmpty
 
 _VAULT_BASE_PATH = "secret/data/justifactu/runtime"
 
+# TODO create defines from values in secret_map in enum SecretNames
 # Maps app-level secret names to (vault subpath, vault field key)
 _SECRET_MAP = {
     # sharepoint
@@ -43,11 +44,11 @@ _SECRET_MAP = {
     SecretNames.SITE_NAME.value: ("sharepoint", "site_name"),
     SecretNames.TENANT_ID.value: ("sharepoint", "tenant_id"),
     # smtp
-    SecretNames.SMTP_PASSWORD.value: ("smtp", "password"),
-    SecretNames.SMTP_PORT.value: ("smtp", "port"),
-    SecretNames.SMTP_SERVER.value: ("smtp", "server"),
-    SecretNames.SMTP_USERNAME.value: ("smtp", "username"),
-    SecretNames.SMTP_ADMIN_EMAIL.value: ("smtp", "admin_email"),
+    "SMTP_PASSWORD": ("smtp", "password"),
+    "SMTP_PORT": ("smtp", "port"),
+    "SMTP_SERVER": ("smtp", "host"),
+    "SMTP_USERNAME": ("smtp", "username"),
+    SecretNames.SMTP_DEVELOPER_EMAIL.value: ("smtp", "developer_email"),
     SecretNames.SMTP_OWNER_EMAIL.value: ("smtp", "owner_email"),
 }
 

@@ -188,13 +188,3 @@ def mail_process(
     send_mail_authenticated(author, subject, body)
 
     log.info("Email sent. Process complete.")
-
-
-def main() -> None:
-    send_mail_authenticated(
-        "patata@iciq.es", "Prova mailing", "Cos de la prova de mailing"
-    )
-
-
-if __name__ == "__main__":
-    main()

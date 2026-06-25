@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .logger import get_logger
 from .filesystem import list_dir, move_file, change_file_name
-from .SAP import SAP
+from .SAP_ID import SAP_ID
 from .pdf import merge_pdfs
 from .payments import index_payments
 from .custom_except import MergingBillWithPaymentError, FileDeletionError
@@ -47,7 +47,7 @@ def merge_bills_and_payments(
             # TODO: Add warning and save into QA log with Sharepoint link
             continue
 
-        if not SAP.matches_bill_filename(bill_path.stem):
+        if not SAP_ID.matches_bill_filename(bill_path.stem):
             move_file(bill_path, qa_folder)
             # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match
             log.error(
@@ -56,7 +56,7 @@ def merge_bills_and_payments(
             )
             continue
 
-        sap = SAP.from_filename(bill_path.stem)
+        sap = SAP_ID.from_filename(bill_path.stem)
         matched_payment: Path | None = payment_map.get(str(sap))
 
         if not matched_payment:

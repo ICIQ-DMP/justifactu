@@ -18,6 +18,7 @@
 
 import os
 import time
+import json
 from pathlib import Path
 from typing import cast
 from urllib.parse import quote
@@ -273,7 +274,7 @@ def ensure_remote_folder(
         "@microsoft.graph.conflictBehavior": "replace",
     }
 
-    response = requests.post(url, headers=headers, json=data)
+    response = requests.post(url, headers=headers, json=json.dumps(data))
     if response.status_code not in (200, 201):
         response.raise_for_status()
 

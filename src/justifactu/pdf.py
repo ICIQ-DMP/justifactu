@@ -34,7 +34,9 @@ log = get_logger(__name__)
 
 def parse_sap_id_from_bill(pdf_path: Path) -> str:
     """Reads a PDF file to extract the SAP id"""
-    query_str = r"Fra\.?\s+(\d{10})"
+    query_str = r"Fra\.?\s+(\d{10})"  # TODO: You are breaking encapsulation, use SAP class / SAP resources and
+    # centralize the used regex for recognising SAP IDs
+
     pattern = re.compile(query_str, re.MULTILINE)
 
     reader = PdfReader(pdf_path)
@@ -81,7 +83,10 @@ def rename_payments(pdf_path: Path) -> None:
         log.warning(f"{pdf_path} is not a directory")
         return
 
-    pattern = re.compile(r"\d{10}-P$")
+    pattern = re.compile(
+        r"\d{10}-P$"
+    )  # TODO: You are breaking encapsulation, use SAP class / SAP resources and
+    # centralize the used regex for recognising SAP IDs
 
     for entry in list(pdf_path.rglob("*")):
         if entry.is_dir():

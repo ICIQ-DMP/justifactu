@@ -24,6 +24,9 @@ from .defines import FileSuffix
 log = get_logger(__name__)
 
 
+# TODO: Split in two functions: One is naif, and creates a dict of content inside a folder dict[str, Path].
+# the other function is specialized and receives this dict and parses it so that only pdf files matching SAP ID remain
+# in the dict.
 def index_payments(payments_folder: Path) -> dict[str, Path]:
     """Scans the payments folder and returns a mapping of SAP numbers to file paths."""
     payment_map: dict[str, Path] = {}

@@ -41,6 +41,8 @@ class FolderName(str, Enum):
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
+    SHAREPOINT_INPUT_PATH = "justifactu/_input"
+    SHAREPOINT_OUTPUT_PATH = "justifactu/_output"
 
 
 class FileSuffix(str, Enum):

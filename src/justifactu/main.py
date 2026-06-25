@@ -16,7 +16,7 @@
 from pathlib import Path
 
 from justifactu.arguments import process_parse_arguments
-from justifactu.defines import NOW
+from justifactu.defines import NOW, InputLocation, FolderName
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
@@ -25,7 +25,6 @@ from justifactu.logger import (
 from justifactu.bills import merge_bills_and_payments
 from justifactu.pdf import rename_payments
 from justifactu.custom_except import MainCriticalError
-from justifactu.defines import FolderName
 
 logger = get_logger(__name__)
 
@@ -38,8 +37,12 @@ def main() -> None:
 
     args = process_parse_arguments()
 
-    if args.input_location:
-        input_folder = Path(args.input_location)
+    # token_manager = None
+    # drive_id = None
+    default_input_folder = Path("./service/onedrive/data/justifactu/_input")
+
+    if args.location == InputLocation.LOCAL:
+        input_folder = args.input_location or default_input_folder
     else:
         input_folder = Path("./service/onedrive/data/justifactu/_input")
     bills_folder = input_folder / FolderName.BILLS_INPUT

@@ -216,7 +216,7 @@ def download_input_folder(
         remote_path: Remote folder path to download.
         input_path: Local destination directory.
     """
-    log.info("Starting recusive download from SharePoint...")
+    log.info("Starting recursive download from SharePoint...")
     download_folder_recursive(token_manager, drive_id, remote_path, input_path)
     log.info("Download completed.")
 

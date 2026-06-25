@@ -178,8 +178,8 @@ def test_mail_process(mock_log, mock_build_body, mock_send_auth):
 
 
 # def test_send_mail_authenticated_real():
-#   send_mail_authenticated(
-#      read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
-#     "Prova mailing",
-#    "Cos de la prova de mailing",
-# )
+#    send_mail_authenticated(
+#       read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
+#      "Prova mailing",
+#     "Cos de la prova de mailing"
+#  )

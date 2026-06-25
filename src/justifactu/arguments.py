@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 from justifactu.custom_except import ArgumentInputLocationError
-from justifactu.defines import ROOT_FOLDER, InputLocation
+from justifactu.defines import InputLocation
 
 
 def parse_input_type(value: str) -> InputLocation:
@@ -61,18 +61,13 @@ def parse_arguments() -> argparse.Namespace:
         "--input-location",
         type=parse_input_location,
         required=False,
-        default=Path(
-            ROOT_FOLDER,
-            "service",
-            "onedrive",
-            "data",
-            "justifactu",
-            "_input",
-        ),
+        default=None,
         help="Path location of input data. If used, --location local is assumed.",
     )
 
     args = parser.parse_args()
+    if args.input_location is not None:
+        args.location = InputLocation.LOCAL
 
     return args
 

@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .logger import get_logger
 from .filesystem import list_dir, move_file, change_file_name
-from .SAP import SAP
+from .SAP_ID import SAP_ID
 from .pdf import merge_pdfs
 from .payments import index_payments
 from .custom_except import MergingBillWithPaymentError, FileDeletionError
@@ -44,20 +44,23 @@ def merge_bills_and_payments(
     # Process bills and look for matches
     for bill_path in list_dir(bills_folder):
         if not bill_path.is_file() or bill_path.suffix.lower() != ".pdf":
+            # TODO: Add warning and save into QA log with Sharepoint link
             continue
 
-        if not SAP.matches_bill_filename(bill_path.stem):
+        if not SAP_ID.matches_bill_filename(bill_path.stem):
             move_file(bill_path, qa_folder)
+            # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match
             log.error(
                 f"Failed to merge bill file {bill_path}: unexpected name format, moved to QA folder",
                 extra={"qa_report": True},
             )
             continue
 
-        sap = SAP.from_filename(bill_path.stem)
+        sap = SAP_ID.from_filename(bill_path.stem)
         matched_payment: Path | None = payment_map.get(str(sap))
 
         if not matched_payment:
+            # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match
             log.error(f"No matching payment found for bill {bill_path}")
             continue
 
@@ -75,6 +78,7 @@ def merge_bills_and_payments(
         except MergingBillWithPaymentError as e:
             log.exception(f"Failed to process {bill_path.name}: {e}")
 
+    # TODO: If you process not matched payments in the previous loop you can skip this loop entirely
     unmatched_payments = set(payment_map.values()) - successful_payments
     for payment in unmatched_payments:
         log.error(f"No matching payment found for {payment.name}")

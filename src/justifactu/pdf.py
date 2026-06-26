@@ -27,14 +27,16 @@ from .custom_except import (
 
 from .filesystem import change_file_name
 from .logger import get_logger
-from .SAP import SAP
+from .SAP_ID import SAP_ID
 
 log = get_logger(__name__)
 
 
 def parse_sap_id_from_bill(pdf_path: Path) -> str:
     """Reads a PDF file to extract the SAP id"""
-    query_str = r"Fra\.?\s+(\d{10})"
+    query_str = r"Fra\.?\s+(\d{10})"  # TODO: You are breaking encapsulation, use SAP class / SAP resources and
+    # centralize the used regex for recognising SAP IDs
+
     pattern = re.compile(query_str, re.MULTILINE)
 
     reader = PdfReader(pdf_path)
@@ -56,7 +58,7 @@ def parse_sap_id_from_bill(pdf_path: Path) -> str:
 def extract_sap_number(filename: str) -> str:
     """Extracts the numeric SAP ID from a filename."""
     try:
-        return str(SAP.from_filename(filename))
+        return str(SAP_ID.from_filename(filename))
 
     except ParseSAPIdException as e:
         log.error(f"Failed to parse SAP ID from {filename}: {e}")
@@ -77,10 +79,14 @@ def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
 def rename_payments(pdf_path: Path) -> None:
     """Renames the files from the payments folder"""
     if not pdf_path.is_dir():
+        # TODO: this is an error, log it as an error and throw exception
         log.warning(f"{pdf_path} is not a directory")
         return
 
-    pattern = re.compile(r"\d{10}-P$")
+    pattern = re.compile(
+        r"\d{10}-P$"
+    )  # TODO: You are breaking encapsulation, use SAP class / SAP resources and
+    # centralize the used regex for recognising SAP IDs
 
     for entry in list(pdf_path.rglob("*")):
         if entry.is_dir():
@@ -104,6 +110,8 @@ def rename_payments(pdf_path: Path) -> None:
                 continue
 
             log.info(f"File name changed to: {updated_entry.name}")
+
+        # TODO: except ParseSAPIdException
 
         except SkippedPdfRenamingInvalidSapId:
             log.warning(f"Skipped {entry.name} due to invalid value")

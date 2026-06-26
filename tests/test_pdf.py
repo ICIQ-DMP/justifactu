@@ -19,38 +19,40 @@ from unittest.mock import patch
 import pytest
 
 from conftest import create_blank_pdf
+from justifactu.SAP_ID import SAP_ID, pattern
 from justifactu.defines import FileSuffix, FolderName
 from justifactu.bills import (
     cleanup_processed_files,
     merge_bills_and_payments,
     index_payments,
+    sap_id_from_filename,
 )
+from justifactu.payments import index_folder
 from justifactu.pdf import (
-    extract_sap_number,
     merge_pdfs,
     rename_payments,
 )
 
-SAP_ID = "2034567890"
+id_sap = SAP_ID("2034567890")
 
 
 # ── extract_sap_number ────────────────────────────────────────────────────────
 
 
 def test_extract_sap_number_from_payment_filename():
-    assert extract_sap_number("2034567890-P") == "2034567890"
+    assert sap_id_from_filename("2034567890-P") == SAP_ID("2034567890")
 
 
 def test_extract_sap_number_from_bill_filename():
-    assert extract_sap_number("F 2034567890") == "2034567890"
+    assert sap_id_from_filename("F 2034567890") == SAP_ID("2034567890")
 
 
 def test_extract_sap_number_digits_only():
-    assert extract_sap_number("2034567890") == "2034567890"
+    assert sap_id_from_filename("2034567890") == SAP_ID("2034567890")
 
 
 def test_extract_sap_number_strips_all_non_digits():
-    assert extract_sap_number("abc-2034567890-xyz") == "2034567890"
+    assert sap_id_from_filename("abc-2034567890-xyz") == SAP_ID("2034567890")
 
 
 # ── index_payments ────────────────────────────────────────────────────────────
@@ -59,22 +61,22 @@ def test_extract_sap_number_strips_all_non_digits():
 def test_index_payments_maps_sap_to_path(tmp_path):
     payments_dir = tmp_path / "Remeses"
     payments_dir.mkdir()
-    pdf = payments_dir / f"{SAP_ID}-P.pdf"
+    pdf = payments_dir / f"{id_sap}-P.pdf"
     create_blank_pdf(pdf)
 
-    result = index_payments(payments_dir)
+    result = index_payments(index_folder(payments_dir))
 
     assert SAP_ID in result
-    assert result[SAP_ID] == pdf
+    assert result[id_sap] == pdf
 
 
 def test_index_payments_skips_merged_files(tmp_path):
     payments_dir = tmp_path / "Remeses"
     payments_dir.mkdir()
-    merged = payments_dir / f"{SAP_ID}-P_merged.pdf"
+    merged = payments_dir / f"{pattern}-P_merged.pdf"
     create_blank_pdf(merged)
 
-    result = index_payments(payments_dir)
+    result = index_payments(index_folder(payments_dir))
 
     assert result == {}
 
@@ -85,7 +87,7 @@ def test_index_payments_skips_invalid_sap_length(tmp_path):
     bad = payments_dir / "12345-P.pdf"  # only 5 digits
     create_blank_pdf(bad)
 
-    result = index_payments(payments_dir)
+    result = index_payments(index_folder(payments_dir))
 
     assert result == {}
 
@@ -94,7 +96,7 @@ def test_index_payments_empty_folder(tmp_path):
     payments_dir = tmp_path / "Remeses"
     payments_dir.mkdir()
 
-    result = index_payments(payments_dir)
+    result = index_payments(index_folder(payments_dir))
 
     assert result == {}
 

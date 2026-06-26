@@ -24,18 +24,16 @@ from .custom_except import (
     SkippedPdfRenamingInvalidSapId,
     UnexpectedRenamingError,
 )
-
+from .SAP_ID import pattern as SAP_pattern
 from .filesystem import change_file_name
 from .logger import get_logger
-from .SAP_ID import SAP_ID
 
 log = get_logger(__name__)
 
 
 def parse_sap_id_from_bill(pdf_path: Path) -> str:
     """Reads a PDF file to extract the SAP id"""
-    query_str = r"Fra\.?\s+(\d{10})"  # TODO: You are breaking encapsulation, use SAP class / SAP resources and
-    # centralize the used regex for recognising SAP IDs
+    query_str = r"(Fra\.?\s+)" + SAP_pattern
 
     pattern = re.compile(query_str, re.MULTILINE)
 
@@ -43,26 +41,22 @@ def parse_sap_id_from_bill(pdf_path: Path) -> str:
 
     for page in reader.pages:
         text = page.extract_text()
+        print("THIS IS THE TEXT")
+        print(text)
         if not text:
             continue
 
-        match = pattern.search(text)
+        match = pattern.findall(text)
+        print("this is match 1:2")
+        # print(match[0][1:3])
+        print("this is match")
+        print(match)
         if not match:
             continue
 
-        return match.group(1)
+        return "".join(match[0][1:3])
 
     raise ParseSAPIdException(f"No SAP ID found in {pdf_path}")
-
-
-def extract_sap_number(filename: str) -> str:
-    """Extracts the numeric SAP ID from a filename."""
-    try:
-        return str(SAP_ID.from_filename(filename))
-
-    except ParseSAPIdException as e:
-        log.error(f"Failed to parse SAP ID from {filename}: {e}")
-        raise
 
 
 def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
@@ -79,20 +73,16 @@ def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
 def rename_payments(pdf_path: Path) -> None:
     """Renames the files from the payments folder"""
     if not pdf_path.is_dir():
-        # TODO: this is an error, log it as an error and throw exception
         log.error(f"{pdf_path} is not a directory")
         raise NotADirectoryError(f"{pdf_path} is not a directory")
 
-    pattern = re.compile(
-        r"\d{10}-P$"
-    )  # TODO: You are breaking encapsulation, use SAP class / SAP resources and
-    # centralize the used regex for recognising SAP IDs
+    rename_pattern = re.compile(SAP_pattern + r"-P$")
 
     for entry in list(pdf_path.rglob("*")):
         if entry.is_dir():
             continue
 
-        if pattern.search(entry.stem):
+        if rename_pattern.search(entry.stem):
             continue
 
         if entry.suffix.lower() != ".pdf":

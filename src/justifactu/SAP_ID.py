@@ -20,8 +20,6 @@ from .logger import get_logger
 
 log = get_logger(__name__)
 
-# TODO: I made this variable public by exposing it, you were using three different versions of it!
-# TODO: match with more restriction: First 2 digits of year are going to be 20 always (support until 2099)
 pattern = r"(20\d{2})(\d{6})"
 
 
@@ -37,31 +35,21 @@ class SAP_ID:
     def __str__(self) -> str:
         return str(self.sap_id)
 
-    # TODO: The following two methods break the single responsibility principle: SAP class does not need to know about
-    # files or bills. Move to bill.py. Also, I think you only need one of these methods
-    @classmethod
-    def from_filename(cls, filename: str) -> "SAP_ID":
-        """Extracts digits from a filename and returns a validated SAP instance."""
-        print("\n\nEntering SAP.from_filename")
-        print(filename)
-        matches = re.findall(pattern, filename)
 
-        if len(matches) > 1:
-            # TODO: throw exception or make assumption
-            raise ParseSAPIdException(
-                f"Found multiple matches for {filename}, assuming first match"
-            )
+# TODO change name and function to parse_sap_id_from_string
+def sap_id_from_filename(filename: str) -> SAP_ID:
+    """Extracts digits from a filename and returns a validated SAP instance."""
+    matches = re.findall(pattern, filename)
 
-        elif len(matches) == 0:
-            log.error(f"No matches found for {filename}")
-            raise ParseSAPIdException(f"Invalid SAP ID: {filename}")
+    if len(matches) > 1:
+        raise ParseSAPIdException(
+            f"Found multiple matches for {filename}, assuming first match"
+        )
 
-        cleaned_sap_id = "".join(matches[0])
+    elif len(matches) == 0:
+        log.error(f"No matches found for {filename}")
+        raise ParseSAPIdException(f"Invalid SAP ID: {filename}")
 
-        return cls(cleaned_sap_id)
+    cleaned_sap_id = "".join(matches[0])
 
-    @classmethod
-    def matches_bill_filename(cls, stem: str) -> bool:
-        """Returns True if stem matches the expected bill filename format (e.g. 'F 2034567890')."""
-        filename_pattern = r"F\s" + pattern
-        return bool(re.fullmatch(filename_pattern, stem))
+    return SAP_ID(cleaned_sap_id)

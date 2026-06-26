@@ -16,35 +16,38 @@
 
 from pathlib import Path
 
+from .SAP_ID import SAP_ID, sap_id_from_filename
 from .logger import get_logger
 from .custom_except import ParseSAPIdException
-from .pdf import extract_sap_number
 from .defines import FileSuffix
 
 log = get_logger(__name__)
 
 
-# TODO: Split in two functions: One is naif, and creates a dict of content inside a folder dict[str, Path].
-# the other function is specialized and receives this dict and parses it so that only pdf files matching SAP ID remain
-# in the dict.
-def index_payments(payments_folder: Path) -> dict[str, Path]:
-    """Scans the payments folder and returns a mapping of SAP numbers to file paths."""
-    payment_map: dict[str, Path] = {}
+# TODO move to filesystem.py
+def index_folder(folder_path: Path) -> dict[str, Path]:
+    """Returns a mapping of filename to path for every file in the folder."""
+    return {entry.name: entry for entry in folder_path.rglob("*") if entry.is_file()}
 
-    for payment_path in payments_folder.rglob("*.pdf"):
-        if not payment_path.is_file():
+
+def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
+    payment_map: dict[SAP_ID, Path] = {}
+
+    for filename, payment_path in folder_map.items():
+
+        if payment_path.suffix.lower() != ".pdf":
+            log.warning(f"Skipping {payment_path} because it is not a PDF")
             continue
 
         if payment_path.stem.endswith(FileSuffix.PROCESSED_PAYMENT):
-            log.info(f"Skipping {payment_path} because it is already merged")
+            log.info(f"Skipping {payment_path} because it is already processed")
             continue
 
         try:
-            sap_number = extract_sap_number(payment_path.name)
+            sap_number = sap_id_from_filename(filename)
             payment_map[sap_number] = payment_path
+
         except ParseSAPIdException:
-            log.error(
-                f"Failed to parse SAP ID from {payment_path}: {payment_path.name}"
-            )
+            log.error(f"Failed to parse SAP ID from {payment_path}: {filename}")
 
     return payment_map

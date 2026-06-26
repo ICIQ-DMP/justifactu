@@ -13,21 +13,24 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
 from pathlib import Path
 
-
-from .logger import get_logger
-from .filesystem import list_dir, move_file, change_file_name
-from .SAP_ID import SAP_ID
-from .pdf import merge_pdfs
-from .payments import index_payments
-from .custom_except import MergingBillWithPaymentError, FileDeletionError
+from .SAP_ID import sap_id_from_filename
+from .custom_except import (
+    MergingBillWithPaymentError,
+    FileDeletionError,
+    ParseSAPIdException,
+)
 from .defines import FolderName, FileSuffix
+from .filesystem import list_dir, move_file, change_file_name
+from .logger import get_logger
+from .payments import index_payments, index_folder
+from .pdf import merge_pdfs
 
 log = get_logger(__name__)
 
 
+# TODO move to process.py
 def merge_bills_and_payments(
     bills_folder: Path,
     payments_folder: Path,
@@ -37,7 +40,7 @@ def merge_bills_and_payments(
     """Merges bills and payments and saves them into merge_folder"""
 
     merge_folder.mkdir(parents=True, exist_ok=True)
-    payment_map = index_payments(payments_folder)
+    payment_map = index_payments(index_folder(payments_folder))
     successful_payments: set[Path] = set()
     qa_folder = merge_folder / FolderName.QA_ERRORS
 
@@ -51,7 +54,9 @@ def merge_bills_and_payments(
             )
             continue
 
-        if not SAP_ID.matches_bill_filename(bill_path.stem):
+        try:
+            sap = sap_id_from_filename(bill_path.stem)
+        except ParseSAPIdException:
             move_file(bill_path, qa_folder)
             # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match
             log.error(
@@ -60,8 +65,7 @@ def merge_bills_and_payments(
             )
             continue
 
-        sap = SAP_ID.from_filename(bill_path.stem)
-        matched_payment: Path | None = payment_map.get(str(sap))
+        matched_payment: Path | None = payment_map.get(sap)
 
         if not matched_payment:
             # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match
@@ -83,6 +87,7 @@ def merge_bills_and_payments(
             log.exception(f"Failed to process {bill_path.name}: {e}")
 
 
+# TODO same as previous one
 def cleanup_processed_files(
     bill_path: Path, matched_payment: Path, delete_processed: bool
 ) -> None:

@@ -75,18 +75,19 @@ def move_file(origin_path: Path, target_path: Path) -> None:
 
 def change_file_name(file: Path, new_name: str) -> Path | None:
     """Changes the name of a file"""
+
     if not file.exists():
-        # TODO: convert into exceptions
         log.warning(f"File not found at {file}")
-        return None
+        raise FileNotFoundError(f"File not found at {file}")
 
     new_path = file.with_stem(new_name)
 
     if new_path.exists():
         log.warning(f"A file named {new_path.name} already exists.")
-        return None
+        raise FileExistsError(f"Destination file already exists: {new_path}")
 
     file.rename(new_path)
+    log.info(f"Renamed: {file} to {new_path}")
     return new_path
 
 

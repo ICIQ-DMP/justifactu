@@ -80,8 +80,8 @@ def rename_payments(pdf_path: Path) -> None:
     """Renames the files from the payments folder"""
     if not pdf_path.is_dir():
         # TODO: this is an error, log it as an error and throw exception
-        log.warning(f"{pdf_path} is not a directory")
-        return
+        log.error(f"{pdf_path} is not a directory")
+        raise NotADirectoryError(f"{pdf_path} is not a directory")
 
     pattern = re.compile(
         r"\d{10}-P$"
@@ -111,7 +111,8 @@ def rename_payments(pdf_path: Path) -> None:
 
             log.info(f"File name changed to: {updated_entry.name}")
 
-        # TODO: except ParseSAPIdException
+        except ParseSAPIdException as e:
+            log.error(f"Failed to parse SAP ID from {entry}: {e}")
 
         except SkippedPdfRenamingInvalidSapId:
             log.warning(f"Skipped {entry.name} due to invalid value")

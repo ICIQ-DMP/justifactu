@@ -45,6 +45,10 @@ def merge_bills_and_payments(
     for bill_path in list_dir(bills_folder):
         if not bill_path.is_file() or bill_path.suffix.lower() != ".pdf":
             # TODO: Add warning and save into QA log with Sharepoint link
+            log.warning(
+                f"Skipped bill file because it is not a PDF file: {bill_path}",
+                extra={"qa_report": True},
+            )
             continue
 
         if not SAP_ID.matches_bill_filename(bill_path.stem):
@@ -77,11 +81,6 @@ def merge_bills_and_payments(
             cleanup_processed_files(bill_path, matched_payment, delete_processed)
         except MergingBillWithPaymentError as e:
             log.exception(f"Failed to process {bill_path.name}: {e}")
-
-    # TODO: If you process not matched payments in the previous loop you can skip this loop entirely
-    unmatched_payments = set(payment_map.values()) - successful_payments
-    for payment in unmatched_payments:
-        log.error(f"No matching payment found for {payment.name}")
 
 
 def cleanup_processed_files(

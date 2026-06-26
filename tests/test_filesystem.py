@@ -138,10 +138,10 @@ def test_change_file_name_success(tmp_path):
     assert not original.exists()
 
 
-def test_change_file_name_nonexistent_returns_none(tmp_path):
+def test_change_file_name_nonexistent(tmp_path):
     missing = tmp_path / "missing.pdf"
-    result = change_file_name(missing, "anything")
-    assert result is None
+    with pytest.raises(FileNotFoundError):
+        change_file_name(missing, "anything")
 
 
 def test_change_file_name_collision_returns_none(tmp_path):
@@ -150,5 +150,5 @@ def test_change_file_name_collision_returns_none(tmp_path):
     conflict = tmp_path / "conflict.pdf"
     conflict.touch()
 
-    result = change_file_name(original, "conflict")
-    assert result is None
+    with pytest.raises(FileExistsError):
+        change_file_name(original, "conflict")

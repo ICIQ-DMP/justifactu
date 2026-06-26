@@ -22,7 +22,7 @@ log = get_logger(__name__)
 
 # TODO: I made this variable public by exposing it, you were using three different versions of it!
 # TODO: match with more restriction: First 2 digits of year are going to be 20 always (support until 2099)
-pattern = r"(\d{4})(\d{6})"
+pattern = r"(20\d{2})(\d{6})"
 
 
 class SAP_ID:
@@ -48,8 +48,12 @@ class SAP_ID:
 
         if len(matches) > 1:
             # TODO: throw exception or make assumption
-            print("there is more than one ID, assuming first ID")
+            raise ParseSAPIdException(
+                f"Found multiple matches for {filename}, assuming first match"
+            )
+
         elif len(matches) == 0:
+            log.error(f"No matches found for {filename}")
             raise ParseSAPIdException(f"Invalid SAP ID: {filename}")
 
         cleaned_sap_id = "".join(matches[0])
@@ -58,6 +62,6 @@ class SAP_ID:
 
     @classmethod
     def matches_bill_filename(cls, stem: str) -> bool:
-        """Returns True if stem matches the expected bill filename format (e.g. 'F 1234567890')."""
+        """Returns True if stem matches the expected bill filename format (e.g. 'F 2034567890')."""
         filename_pattern = r"F\s" + pattern
         return bool(re.fullmatch(filename_pattern, stem))

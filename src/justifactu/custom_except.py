@@ -55,3 +55,7 @@ class VaultSecretEmpty(Exception):
 
 class BadSharepointListUpdateRequestError(Exception):
     """Raised when a sharepoint list update request cannot be made."""
+
+
+class DirectoryNotFoundError(Exception):
+    """Raised when a directory cannot be found."""

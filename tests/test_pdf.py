@@ -16,6 +16,8 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from conftest import create_blank_pdf
 from justifactu.defines import FileSuffix, FolderName
 from justifactu.bills import (
@@ -29,26 +31,26 @@ from justifactu.pdf import (
     rename_payments,
 )
 
-SAP_ID = "1234567890"
+SAP_ID = "2034567890"
 
 
 # ── extract_sap_number ────────────────────────────────────────────────────────
 
 
 def test_extract_sap_number_from_payment_filename():
-    assert extract_sap_number("1234567890-P") == "1234567890"
+    assert extract_sap_number("2034567890-P") == "2034567890"
 
 
 def test_extract_sap_number_from_bill_filename():
-    assert extract_sap_number("F 1234567890") == "1234567890"
+    assert extract_sap_number("F 2034567890") == "2034567890"
 
 
 def test_extract_sap_number_digits_only():
-    assert extract_sap_number("1234567890") == "1234567890"
+    assert extract_sap_number("2034567890") == "2034567890"
 
 
 def test_extract_sap_number_strips_all_non_digits():
-    assert extract_sap_number("abc-1234567890-xyz") == "1234567890"
+    assert extract_sap_number("abc-2034567890-xyz") == "2034567890"
 
 
 # ── index_payments ────────────────────────────────────────────────────────────
@@ -197,7 +199,8 @@ def test_rename_payments_not_a_directory(tmp_path):
     create_blank_pdf(not_a_dir)
 
     # Should log a warning and return without raising
-    rename_payments(not_a_dir)
+    with pytest.raises(NotADirectoryError):
+        rename_payments(not_a_dir)
 
 
 # ── merge_bills_and_payments ──────────────────────────────────────────────────

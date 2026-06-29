@@ -19,15 +19,14 @@ from unittest.mock import patch
 import pytest
 
 from conftest import create_blank_pdf
-from justifactu.SAP_ID import SAP_ID, pattern, sap_id_from_filename
+from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
 from justifactu.defines import FileSuffix, FolderName
 from justifactu.bills import (
     cleanup_processed_files,
     merge_bills_and_payments,
     index_payments,
 )
-
-from justifactu.payments import index_folder
+from justifactu.filesystem import index_folder
 from justifactu.pdf import (
     merge_pdfs,
     rename_payments,
@@ -40,19 +39,19 @@ id_sap_instance = SAP_ID("2034567890")
 
 
 def test_extract_sap_number_from_payment_filename():
-    assert sap_id_from_filename("2034567890-P") == SAP_ID("2034567890")
+    assert parse_sap_id_from_string("2034567890-P") == SAP_ID("2034567890")
 
 
 def test_extract_sap_number_from_bill_filename():
-    assert sap_id_from_filename("F 2034567890") == SAP_ID("2034567890")
+    assert parse_sap_id_from_string("F 2034567890") == SAP_ID("2034567890")
 
 
 def test_extract_sap_number_digits_only():
-    assert sap_id_from_filename("2034567890") == SAP_ID("2034567890")
+    assert parse_sap_id_from_string("2034567890") == SAP_ID("2034567890")
 
 
 def test_extract_sap_number_strips_all_non_digits():
-    assert sap_id_from_filename("abc-2034567890-xyz") == SAP_ID("2034567890")
+    assert parse_sap_id_from_string("abc-2034567890-xyz") == SAP_ID("2034567890")
 
 
 # ── index_payments ────────────────────────────────────────────────────────────

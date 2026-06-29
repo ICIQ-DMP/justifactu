@@ -15,16 +15,16 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from pathlib import Path
 
-from .SAP_ID import sap_id_from_filename
+from .SAP_ID import parse_sap_id_from_string
 from .custom_except import (
     MergingBillWithPaymentError,
     FileDeletionError,
     ParseSAPIdException,
 )
 from .defines import FolderName, FileSuffix
-from .filesystem import list_dir, move_file, change_file_name
+from .filesystem import list_dir, move_file, change_file_name, index_folder
 from .logger import get_logger
-from .payments import index_payments, index_folder
+from .payments import index_payments
 from .pdf import merge_pdfs
 
 log = get_logger(__name__)
@@ -55,7 +55,7 @@ def merge_bills_and_payments(
             continue
 
         try:
-            sap = sap_id_from_filename(bill_path.stem)
+            sap = parse_sap_id_from_string(bill_path.stem)
         except ParseSAPIdException:
             move_file(bill_path, qa_folder)
             # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match

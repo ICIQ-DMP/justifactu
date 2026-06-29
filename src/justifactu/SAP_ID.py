@@ -43,7 +43,7 @@ class SAP_ID:
 
 
 # TODO change name and function to parse_sap_id_from_string
-def sap_id_from_filename(filename: str) -> SAP_ID:
+def parse_sap_id_from_string(filename: str) -> SAP_ID:
     """Extracts digits from a filename and returns a validated SAP instance."""
     matches = re.findall(pattern, filename)
 

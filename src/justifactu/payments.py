@@ -16,7 +16,7 @@
 
 from pathlib import Path
 
-from .SAP_ID import SAP_ID, sap_id_from_filename
+from .SAP_ID import SAP_ID, parse_sap_id_from_string
 from .logger import get_logger
 from .custom_except import ParseSAPIdException
 from .defines import FileSuffix
@@ -25,9 +25,6 @@ log = get_logger(__name__)
 
 
 # TODO move to filesystem.py
-def index_folder(folder_path: Path) -> dict[str, Path]:
-    """Returns a mapping of filename to path for every file in the folder."""
-    return {entry.name: entry for entry in folder_path.rglob("*") if entry.is_file()}
 
 
 def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
@@ -44,7 +41,7 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
             continue
 
         try:
-            sap_number = sap_id_from_filename(filename)
+            sap_number = parse_sap_id_from_string(filename)
             payment_map[sap_number] = payment_path
 
         except ParseSAPIdException:

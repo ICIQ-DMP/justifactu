@@ -44,12 +44,13 @@ _SECRET_MAP = {
     SecretNames.SITE_NAME.value: ("sharepoint", "site_name"),
     SecretNames.TENANT_ID.value: ("sharepoint", "tenant_id"),
     # smtp
-    "SMTP_PASSWORD": ("smtp", "password"),
-    "SMTP_PORT": ("smtp", "port"),
-    "SMTP_SERVER": ("smtp", "host"),
-    "SMTP_USERNAME": ("smtp", "username"),
+    SecretNames.SMTP_PASSWORD.value: ("smtp", "password"),
+    SecretNames.SMTP_PORT.value: ("smtp", "port"),
+    SecretNames.SMTP_SERVER.value: ("smtp", "host"),
+    SecretNames.SMTP_USERNAME: ("smtp", "username"),
     SecretNames.SMTP_DEVELOPER_EMAIL.value: ("smtp", "developer_email"),
     SecretNames.SMTP_OWNER_EMAIL.value: ("smtp", "owner_email"),
+    SecretNames.SMTP_ADMIN_EMAIL.value: ("smtp", "admin_email"),
 }
 
 

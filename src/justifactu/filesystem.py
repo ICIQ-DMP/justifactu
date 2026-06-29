@@ -160,3 +160,8 @@ def read_file(file_path: Path) -> str:
         content = file.read()
 
     return content
+
+
+def index_folder(folder_path: Path) -> dict[str, Path]:
+    """Returns a mapping of filename to path for every file in the folder."""
+    return {entry.name: entry for entry in folder_path.rglob("*") if entry.is_file()}

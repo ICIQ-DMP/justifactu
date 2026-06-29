@@ -20,20 +20,23 @@ from .logger import get_logger
 
 log = get_logger(__name__)
 
-pattern = r"(20\d{2})(\d{6})"
+pattern = r"(?P<year>20\d{2})(?P<sapid>\d{6})"
 
 
 class SAP_ID:
+    _PATTERN = re.compile(pattern)
+
     def __init__(self, raw_sap_id: str) -> None:
-        match = re.fullmatch(pattern, raw_sap_id)
+        match = self._PATTERN.fullmatch(raw_sap_id)
 
         if not match:
             raise ParseSAPIdException(f"Invalid SAP ID: {raw_sap_id}")
-        self.sap_id = raw_sap_id
-        self.year = match.group(1)
+
+        self.sap_id = match["sapid"]
+        self.year = match["year"]
 
     def __str__(self) -> str:
-        return str(self.sap_id)
+        return str(self.year + self.sap_id)
 
     def __eq__(self, __o: object) -> bool:
         return str(self) == str(__o)
@@ -42,19 +45,18 @@ class SAP_ID:
         return hash(self.sap_id)
 
 
-# TODO change name and function to parse_sap_id_from_string
-def parse_sap_id_from_string(filename: str) -> SAP_ID:
+def parse_sap_id_from_string(string: str) -> SAP_ID:
     """Extracts digits from a filename and returns a validated SAP instance."""
-    matches = re.findall(pattern, filename)
+    matches = re.findall(pattern, string)
 
     if len(matches) > 1:
         raise ParseSAPIdException(
-            f"Found multiple matches for {filename}, assuming first match"
+            f"Found multiple matches for {string}, assuming first match"
         )
 
     elif len(matches) == 0:
-        log.error(f"No matches found for {filename}")
-        raise ParseSAPIdException(f"Invalid SAP ID: {filename}")
+        log.error(f"No matches found for {string}")
+        raise ParseSAPIdException(f"Invalid SAP ID: {string}")
 
     cleaned_sap_id = "".join(matches[0])
 

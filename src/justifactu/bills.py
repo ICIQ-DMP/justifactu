@@ -13,9 +13,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import re
 from pathlib import Path
 
-from .SAP_ID import parse_sap_id_from_string
+from .SAP_ID import SAP_ID, pattern
 from .custom_except import (
     MergingBillWithPaymentError,
     FileDeletionError,
@@ -55,7 +56,7 @@ def merge_bills_and_payments(
             continue
 
         try:
-            sap = parse_sap_id_from_string(bill_path.stem)
+            sap = parse_bill_filename(bill_path.stem)
         except ParseSAPIdException:
             move_file(bill_path, qa_folder)
             # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match
@@ -106,3 +107,16 @@ def cleanup_processed_files(
             log.info(f"Deleted: {bill_path.name}")
         except FileDeletionError as e:
             log.exception(f"Failed to delete {bill_path.name}: {e}")
+
+
+def parse_bill_filename(bill_name: str) -> SAP_ID:
+    bill_patt = re.compile(rf"F\s{pattern}")
+
+    match = bill_patt.fullmatch(bill_name)
+
+    if not match:
+        raise ParseSAPIdException(f"Failed to parse {bill_name}")
+
+    bill_sap_id = SAP_ID(match.group("year") + match.group("sapid"))
+
+    return bill_sap_id

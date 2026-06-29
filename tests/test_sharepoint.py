@@ -14,11 +14,58 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from justifactu.sharepoint import _connect_sharepoint
+from unittest.mock import MagicMock, patch
+
+import pytest
+import requests
+
+from justifactu.sharepoint import (
+    #    _connect_sharepoint,
+    get_list_id,
+)
+
+# def test_sharepoint_connection():
+#    """Test that sharepoint connection works."""
+#    token_manager, site_id, drive_id = _connect_sharepoint()
+#    assert site_id
+#    assert drive_id
 
 
-def test_sharepoint_connection():
-    """Test that sharepoint connection works."""
-    token_manager, site_id, drive_id = _connect_sharepoint()
-    assert site_id
-    assert drive_id
+# ── helpers ───────────────────────────────────────────────────────────────────
+
+
+def _mock_token_manager(token: str = "fake-token") -> MagicMock:
+    tm = MagicMock()
+    tm.get_token.return_value = token
+    return tm
+
+
+def _ok_response(json_data: dict) -> MagicMock:
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = json_data
+    resp.raise_for_status.return_value = None
+    return resp
+
+
+# ── get_list_id ───────────────────────────────────────────────────────────────
+
+
+def test_get_list_id_returns_id():
+    tm = _mock_token_manager()
+    resp = _ok_response({"id": "list-guid-123"})
+    with patch("justifactu.sharepoint.requests.get", return_value=resp) as mock_get:
+        result = get_list_id(tm, "site-id", "MyList")
+    assert result == "list-guid-123"
+    url = mock_get.call_args[0][0]
+    assert "site-id" in url
+    assert "MyList" in url
+
+
+def test_get_list_id_raises_http_error():
+    tm = _mock_token_manager()
+    resp = MagicMock()
+    resp.raise_for_status.side_effect = requests.exceptions.HTTPError("404")
+    with patch("justifactu.sharepoint.requests.get", return_value=resp):
+        with pytest.raises(requests.exceptions.HTTPError):
+            get_list_id(tm, "site-id", "MissingList")

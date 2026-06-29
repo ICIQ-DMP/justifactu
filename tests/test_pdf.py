@@ -33,7 +33,7 @@ from justifactu.pdf import (
     rename_payments,
 )
 
-id_sap = SAP_ID("2034567890")
+id_sap_instance = SAP_ID("2034567890")
 
 
 # ── extract_sap_number ────────────────────────────────────────────────────────
@@ -61,13 +61,13 @@ def test_extract_sap_number_strips_all_non_digits():
 def test_index_payments_maps_sap_to_path(tmp_path):
     payments_dir = tmp_path / "Remeses"
     payments_dir.mkdir()
-    pdf = payments_dir / f"{id_sap}-P.pdf"
+    pdf = payments_dir / f"{id_sap_instance}-P.pdf"
     create_blank_pdf(pdf)
 
     result = index_payments(index_folder(payments_dir))
 
-    assert id_sap in result
-    assert result[id_sap] == pdf
+    assert id_sap_instance in result
+    assert result[id_sap_instance] == pdf
 
 
 def test_index_payments_skips_merged_files(tmp_path):
@@ -136,21 +136,23 @@ def test_merge_pdfs_output_has_two_pages(tmp_path):
 
 
 def test_cleanup_processed_files_renames_payment(tmp_path):
-    bill = tmp_path / f"F {SAP_ID}.pdf"
+    bill = tmp_path / f"F {id_sap_instance}.pdf"
     bill.touch()
-    payment = tmp_path / f"{SAP_ID}-P.pdf"
+    payment = tmp_path / f"{id_sap_instance}-P.pdf"
     payment.touch()
 
     cleanup_processed_files(bill, payment, delete_processed=False)
 
-    assert (tmp_path / f"{SAP_ID}-P{FileSuffix.PROCESSED_PAYMENT}.pdf").exists()
+    assert (
+        tmp_path / f"{id_sap_instance}-P{FileSuffix.PROCESSED_PAYMENT}.pdf"
+    ).exists()
     assert bill.exists()  # not deleted when delete_processed=False
 
 
 def test_cleanup_processed_files_deletes_bill_when_requested(tmp_path):
-    bill = tmp_path / f"F {SAP_ID}.pdf"
+    bill = tmp_path / f"F {id_sap_instance}.pdf"
     bill.touch()
-    payment = tmp_path / f"{SAP_ID}-P.pdf"
+    payment = tmp_path / f"{id_sap_instance}-P.pdf"
     payment.touch()
 
     cleanup_processed_files(bill, payment, delete_processed=True)
@@ -167,17 +169,17 @@ def test_rename_payments_renames_pdf(tmp_path):
     pdf = payments_dir / "some_payment_document.pdf"
     create_blank_pdf(pdf)
 
-    with patch("justifactu.pdf.parse_sap_id_from_bill", return_value=id_sap):
+    with patch("justifactu.pdf.parse_sap_id_from_bill", return_value=id_sap_instance):
         rename_payments(payments_dir)
 
-    assert (payments_dir / f"{id_sap}-P.pdf").exists()
+    assert (payments_dir / f"{id_sap_instance}-P.pdf").exists()
     assert not pdf.exists()
 
 
 def test_rename_payments_skips_already_renamed(tmp_path):
     payments_dir = tmp_path / "Remeses"
     payments_dir.mkdir()
-    already_renamed = payments_dir / f"{id_sap}-P.pdf"
+    already_renamed = payments_dir / f"{id_sap_instance}-P.pdf"
     create_blank_pdf(already_renamed)
 
     with patch("justifactu.pdf.parse_sap_id_from_bill") as mock_parse:
@@ -211,16 +213,18 @@ def test_rename_payments_not_a_directory(tmp_path):
 def test_merge_bills_and_payments_success(billing_dirs):
     bills_dir, payments_dir, output_dir = billing_dirs
 
-    bill = bills_dir / f"F {id_sap}.pdf"
-    payment = payments_dir / f"{id_sap}-P.pdf"
+    bill = bills_dir / f"F {id_sap_instance}.pdf"
+    payment = payments_dir / f"{id_sap_instance}-P.pdf"
     create_blank_pdf(bill)
     create_blank_pdf(payment)
 
     merge_bills_and_payments(bills_dir, payments_dir, output_dir)
 
-    expected_subfolder = output_dir / f"{id_sap.year}{FolderName.YEAR_FOLDER_SUFFIX}"
+    expected_subfolder = (
+        output_dir / f"{id_sap_instance.year}{FolderName.YEAR_FOLDER_SUFFIX}"
+    )
     expected_output = (
-        expected_subfolder / f"{id_sap}{FileSuffix.MERGED_BILL_PAYMENT}.pdf"
+        expected_subfolder / f"{id_sap_instance}{FileSuffix.MERGED_BILL_PAYMENT}.pdf"
     )
     assert expected_output.exists()
 
@@ -241,7 +245,7 @@ def test_merge_bills_and_payments_invalid_bill_format_moved_to_qa(billing_dirs):
 def test_merge_bills_and_payments_no_matching_payment(billing_dirs):
     bills_dir, payments_dir, output_dir = billing_dirs
 
-    bill = bills_dir / f"F {id_sap}.pdf"
+    bill = bills_dir / f"F {id_sap_instance}.pdf"
     create_blank_pdf(bill)
     # No corresponding payment file
 
@@ -249,7 +253,9 @@ def test_merge_bills_and_payments_no_matching_payment(billing_dirs):
     merge_bills_and_payments(bills_dir, payments_dir, output_dir)
 
     expected_output = (
-        output_dir / f"{id_sap.year}_FACTURA+PAGAMENT" / f"{id_sap}_F_P.pdf"
+        output_dir
+        / f"{id_sap_instance.year}_FACTURA+PAGAMENT"
+        / f"{id_sap_instance}_F_P.pdf"
     )
     assert not expected_output.exists()
 
@@ -265,8 +271,8 @@ def test_merge_bills_and_payments_creates_output_folder(billing_dirs):
 def test_merge_bills_and_payments_delete_processed(billing_dirs):
     bills_dir, payments_dir, output_dir = billing_dirs
 
-    bill = bills_dir / f"F {id_sap}.pdf"
-    payment = payments_dir / f"{id_sap}-P.pdf"
+    bill = bills_dir / f"F {id_sap_instance}.pdf"
+    payment = payments_dir / f"{id_sap_instance}-P.pdf"
     create_blank_pdf(bill)
     create_blank_pdf(payment)
 

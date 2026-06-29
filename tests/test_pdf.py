@@ -19,14 +19,14 @@ from unittest.mock import patch
 import pytest
 
 from conftest import create_blank_pdf
-from justifactu.SAP_ID import SAP_ID, pattern
+from justifactu.SAP_ID import SAP_ID, pattern, sap_id_from_filename
 from justifactu.defines import FileSuffix, FolderName
 from justifactu.bills import (
     cleanup_processed_files,
     merge_bills_and_payments,
     index_payments,
-    sap_id_from_filename,
 )
+
 from justifactu.payments import index_folder
 from justifactu.pdf import (
     merge_pdfs,
@@ -66,7 +66,7 @@ def test_index_payments_maps_sap_to_path(tmp_path):
 
     result = index_payments(index_folder(payments_dir))
 
-    assert SAP_ID in result
+    assert id_sap in result
     assert result[id_sap] == pdf
 
 
@@ -167,17 +167,17 @@ def test_rename_payments_renames_pdf(tmp_path):
     pdf = payments_dir / "some_payment_document.pdf"
     create_blank_pdf(pdf)
 
-    with patch("justifactu.pdf.parse_sap_id_from_bill", return_value=SAP_ID):
+    with patch("justifactu.pdf.parse_sap_id_from_bill", return_value=id_sap):
         rename_payments(payments_dir)
 
-    assert (payments_dir / f"{SAP_ID}-P.pdf").exists()
+    assert (payments_dir / f"{id_sap}-P.pdf").exists()
     assert not pdf.exists()
 
 
 def test_rename_payments_skips_already_renamed(tmp_path):
     payments_dir = tmp_path / "Remeses"
     payments_dir.mkdir()
-    already_renamed = payments_dir / f"{SAP_ID}-P.pdf"
+    already_renamed = payments_dir / f"{id_sap}-P.pdf"
     create_blank_pdf(already_renamed)
 
     with patch("justifactu.pdf.parse_sap_id_from_bill") as mock_parse:
@@ -211,16 +211,16 @@ def test_rename_payments_not_a_directory(tmp_path):
 def test_merge_bills_and_payments_success(billing_dirs):
     bills_dir, payments_dir, output_dir = billing_dirs
 
-    bill = bills_dir / f"F {SAP_ID}.pdf"
-    payment = payments_dir / f"{SAP_ID}-P.pdf"
+    bill = bills_dir / f"F {id_sap}.pdf"
+    payment = payments_dir / f"{id_sap}-P.pdf"
     create_blank_pdf(bill)
     create_blank_pdf(payment)
 
     merge_bills_and_payments(bills_dir, payments_dir, output_dir)
 
-    expected_subfolder = output_dir / f"{SAP_ID[:4]}{FolderName.YEAR_FOLDER_SUFFIX}"
+    expected_subfolder = output_dir / f"{id_sap.year}{FolderName.YEAR_FOLDER_SUFFIX}"
     expected_output = (
-        expected_subfolder / f"{SAP_ID}{FileSuffix.MERGED_BILL_PAYMENT}.pdf"
+        expected_subfolder / f"{id_sap}{FileSuffix.MERGED_BILL_PAYMENT}.pdf"
     )
     assert expected_output.exists()
 
@@ -241,7 +241,7 @@ def test_merge_bills_and_payments_invalid_bill_format_moved_to_qa(billing_dirs):
 def test_merge_bills_and_payments_no_matching_payment(billing_dirs):
     bills_dir, payments_dir, output_dir = billing_dirs
 
-    bill = bills_dir / f"F {SAP_ID}.pdf"
+    bill = bills_dir / f"F {id_sap}.pdf"
     create_blank_pdf(bill)
     # No corresponding payment file
 
@@ -249,7 +249,7 @@ def test_merge_bills_and_payments_no_matching_payment(billing_dirs):
     merge_bills_and_payments(bills_dir, payments_dir, output_dir)
 
     expected_output = (
-        output_dir / f"{SAP_ID[:4]}_FACTURA+PAGAMENT" / f"{SAP_ID}_F_P.pdf"
+        output_dir / f"{id_sap.year}_FACTURA+PAGAMENT" / f"{id_sap}_F_P.pdf"
     )
     assert not expected_output.exists()
 
@@ -265,8 +265,8 @@ def test_merge_bills_and_payments_creates_output_folder(billing_dirs):
 def test_merge_bills_and_payments_delete_processed(billing_dirs):
     bills_dir, payments_dir, output_dir = billing_dirs
 
-    bill = bills_dir / f"F {SAP_ID}.pdf"
-    payment = payments_dir / f"{SAP_ID}-P.pdf"
+    bill = bills_dir / f"F {id_sap}.pdf"
+    payment = payments_dir / f"{id_sap}-P.pdf"
     create_blank_pdf(bill)
     create_blank_pdf(payment)
 

@@ -35,6 +35,12 @@ class SAP_ID:
     def __str__(self) -> str:
         return str(self.sap_id)
 
+    def __eq__(self, __o: object) -> bool:
+        return str(self) == str(__o)
+
+    def __hash__(self) -> int:
+        return hash(self.sap_id)
+
 
 # TODO change name and function to parse_sap_id_from_string
 def sap_id_from_filename(filename: str) -> SAP_ID:

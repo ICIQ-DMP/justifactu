@@ -81,7 +81,7 @@ def merge_bills_and_payments(
         try:
             log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
             merge_pdfs(bill_path, matched_payment, output_path)
-            # TODO upload output path to sharepoint
+            # TODO upload output path to sharepoint. Should it be per file or whole folder?
             successful_payments.add(matched_payment)
             cleanup_processed_files(bill_path, matched_payment, delete_processed)
         except MergingBillWithPaymentError as e:

@@ -25,7 +25,11 @@ from justifactu.logger import (
 from justifactu.process import merge_bills_and_payments
 from justifactu.pdf import rename_payments
 from justifactu.custom_except import MainCriticalError
-from justifactu.sharepoint import _connect_sharepoint, download_input_folder
+from justifactu.sharepoint import (
+    _connect_sharepoint,
+    download_input_folder,
+    upload_folder_recursive,
+)
 
 logger = get_logger(__name__)
 
@@ -38,14 +42,14 @@ def main() -> None:
 
     args = process_parse_arguments()
 
-    # token_manager = None
-    # drive_id = None
     default_input_folder = Path("./service/onedrive/data/justifactu/_input")
-
+    token_manager = None
+    site_id = None
+    drive_id = None
+    # TODO comentar implementació amb Aleix
     if args.location == InputLocation.LOCAL:
         input_folder = args.input_location or default_input_folder
     else:
-        # TODO check with Aleix implementation of download files
         input_folder = default_input_folder
         token_manager, site_id, drive_id = _connect_sharepoint()
         download_input_folder(
@@ -70,6 +74,17 @@ def main() -> None:
             bills_plus_payments_folder,
             delete_processed=True,
         )
+
+        if args.location == InputLocation.SHAREPOINT:
+            assert token_manager is not None
+            assert drive_id is not None
+            upload_folder_recursive(
+                token_manager,
+                drive_id,
+                input_folder.parent / "_output",
+                FolderName.SHAREPOINT_OUTPUT_PATH,
+            )
+
         logger.info("Finished...")
 
     except MainCriticalError as e:

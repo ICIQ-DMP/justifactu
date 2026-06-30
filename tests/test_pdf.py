@@ -21,10 +21,12 @@ import pytest
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
 from justifactu.defines import FileSuffix, FolderName
-from justifactu.bills import (
+from justifactu.payments import (
+    index_payments,
+)
+from justifactu.process import (
     cleanup_processed_files,
     merge_bills_and_payments,
-    index_payments,
 )
 from justifactu.filesystem import index_folder
 from justifactu.pdf import (

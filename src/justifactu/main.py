@@ -22,9 +22,10 @@ from justifactu.logger import (
     configure_logging_from_settings,
     get_logger,
 )
-from justifactu.bills import merge_bills_and_payments
+from justifactu.process import merge_bills_and_payments
 from justifactu.pdf import rename_payments
 from justifactu.custom_except import MainCriticalError
+from justifactu.sharepoint import _connect_sharepoint, download_input_folder
 
 logger = get_logger(__name__)
 
@@ -44,7 +45,15 @@ def main() -> None:
     if args.location == InputLocation.LOCAL:
         input_folder = args.input_location or default_input_folder
     else:
-        input_folder = Path("./service/onedrive/data/justifactu/_input")
+        # TODO check with Aleix implementation of download files
+        input_folder = default_input_folder
+        token_manager, site_id, drive_id = _connect_sharepoint()
+        download_input_folder(
+            token_manager,
+            drive_id,
+            Path(FolderName.SHAREPOINT_INPUT_PATH),
+            input_folder,
+        )
     bills_folder = input_folder / FolderName.BILLS_INPUT
     payments_folder = input_folder / FolderName.PAYMENTS_INPUT
     bills_plus_payments_folder = (

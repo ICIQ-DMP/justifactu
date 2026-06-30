@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -22,6 +23,8 @@ from justifactu.sharepoint import (
     #    _connect_sharepoint,
     get_list_id,
     get_site_id,
+    get_drive_id,
+    list_folder_contents,
 )
 
 # def test_sharepoint_connection():
@@ -51,7 +54,7 @@ def _ok_response(json_data: dict) -> MagicMock:
 # ── get_list_id ───────────────────────────────────────────────────────────────
 
 
-def test_get_list_id_returns_id():
+def test_get_list_id_returns_id_happy():
     tm = _mock_token_manager()
     resp = _ok_response({"id": "list-guid-123"})
     with patch("justifactu.sharepoint.requests.get", return_value=resp) as mock_get:
@@ -71,7 +74,10 @@ def test_get_list_id_raises_http_error():
             get_list_id(tm, "site-id", "MissingList")
 
 
-def test_get_site_id_returns_id():
+# ── get_site_id ───────────────────────────────────────────────────────────────
+
+
+def test_get_site_id_returns_id_happy():
     tm = _mock_token_manager()
     resp = _ok_response({"id": "site-id"})
     with patch("justifactu.sharepoint.requests.get", return_value=resp) as mock_get:
@@ -91,9 +97,59 @@ def test_get_site_id_raises_http_error():
             get_site_id(tm, "site-id", "MissingList")
 
 
-# def test_drive_id_returns_id():
-#     tm = _mock_token_manager()
-#     resp = MagicMock()
-#     resp.raise_for_status.side_effect = requests.exceptions.HTTPError("404")
-#     with patch("justifactu.sharepoint.requests.get", return_value=resp) as mock_get:
-#         drive_id_result = get_drive_id(tm, "site-id", "MyList")
+# ── get_drive_id ──────────────────────────────────────────────────────────────
+
+
+def test_get_drive_id_returns_id_happy():
+    tm = _mock_token_manager()
+    resp = _ok_response({"value": [{"name": "Documents", "id": "drive-id"}]})
+    with patch("justifactu.sharepoint.requests.get", return_value=resp) as mock_get:
+        drive_id_result = get_drive_id(tm, "site-id")
+    assert drive_id_result == "drive-id"
+    url = mock_get.call_args[0][0]
+    assert "site-id" in url
+
+
+def test_get_drive_id_raises_http_error():
+    tm = _mock_token_manager()
+    resp = MagicMock()
+    resp.raise_for_status.side_effect = requests.exceptions.HTTPError("404")
+    with patch("justifactu.sharepoint.requests.get", return_value=resp):
+        with pytest.raises(requests.exceptions.HTTPError):
+            get_drive_id(tm, "site-id")
+
+
+def test_get_drive_id_raises_exception_drive_not_found():
+    tm = _mock_token_manager()
+    resp = _ok_response({"value": [{"name": "OtherDrive", "id": "other-id"}]})
+    with patch("justifactu.sharepoint.requests.get", return_value=resp):
+        with pytest.raises(Exception, match="no encontrado"):
+            get_drive_id(tm, "site-id")
+
+
+# ── list_folder_contents ─────────────────────────────────────────────────────
+
+
+def test_list_folder_contents_returns_items_happy():
+    tm = _mock_token_manager()
+    items = [
+        {"name": "factura1.pdf", "id": "item1"},
+        {"name": "factura2.pdf", "id": "item2"},
+        {"name": "informe.xslx", "id": "item3"},
+    ]
+    resp = _ok_response({"value": items})
+    with patch("justifactu.sharepoint.requests.get", return_value=resp) as mock_get:
+        result = list_folder_contents(tm, "drive-id", Path("folder/subfolder"))
+    assert result == items
+    url = mock_get.call_args[0][0]
+    assert "drive-id" in url
+    assert "folder/subfolder" in url
+
+
+def test_list_folder_contents_raises_http_error():
+    tm = _mock_token_manager()
+    resp = MagicMock()
+    resp.raise_for_status.side_effect = requests.exceptions.HTTPError("404")
+    with patch("justifactu.sharepoint.requests.get", return_value=resp):
+        with pytest.raises(requests.exceptions.HTTPError):
+            list_folder_contents(tm, "drive-id", Path("folder/subfolder"))

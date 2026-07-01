@@ -27,6 +27,7 @@ from justifactu.pdf import rename_payments
 from justifactu.custom_except import MainCriticalError
 from justifactu.sharepoint import (
     _connect_sharepoint,
+    build_file_url_map,
     download_input_folder,
     upload_folder_recursive,
 )
@@ -64,6 +65,17 @@ def main() -> None:
         input_folder.parent / "_output" / FolderName.MERGED_OUTPUT
     )
 
+    sharepoint_url_map: dict[Path, str] | None = None
+    if args.location == InputLocation.SHAREPOINT:
+        assert token_manager is not None
+        assert drive_id is not None
+        sharepoint_url_map = build_file_url_map(
+            token_manager,
+            drive_id,
+            Path(FolderName.SHAREPOINT_INPUT_PATH) / FolderName.BILLS_INPUT,
+            bills_folder,
+        )
+
     logger.info("Starting...")
 
     try:
@@ -73,6 +85,7 @@ def main() -> None:
             payments_folder,
             bills_plus_payments_folder,
             delete_processed=True,
+            sharepoint_url_map=sharepoint_url_map,
         )
 
         if args.location == InputLocation.SHAREPOINT:

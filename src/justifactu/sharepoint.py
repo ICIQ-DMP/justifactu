@@ -427,6 +427,31 @@ def get_sharepoint_web_url(
     return cast(str, item.get("webUrl"))
 
 
+def build_file_url_map(
+    token_manager: TokenManager,
+    drive_id: str,
+    remote_folder: Path,
+    local_folder: Path,
+) -> dict[Path, str]:
+    """Map local file paths to their SharePoint browser URLs.
+
+    Args:
+        token_manager: Authenticated token manager.
+        drive_id: Graph API drive identifier.
+        remote_folder: Remote folder path relative to the drive root.
+        local_folder: Local directory that mirrors *remote_folder*.
+
+    Returns:
+        Dict mapping each local file path to its SharePoint ``webUrl``.
+    """
+    items = list_folder_contents(token_manager, drive_id, remote_folder)
+    return {
+        local_folder / item["name"]: item["webUrl"]
+        for item in items
+        if "webUrl" in item
+    }
+
+
 def _connect_sharepoint() -> tuple[TokenManager, str, str]:
     """Authenticate with SharePoint and return the connection handles.
 

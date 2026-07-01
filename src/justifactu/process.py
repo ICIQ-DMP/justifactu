@@ -37,6 +37,7 @@ def merge_bills_and_payments(
     payments_folder: Path,
     merge_folder: Path,
     delete_processed: bool = False,
+    sharepoint_url_map: dict[Path, str] | None = None,
 ) -> None:
     """Merges bills and payments and saves them into merge_folder"""
 
@@ -47,10 +48,12 @@ def merge_bills_and_payments(
 
     # Process bills and look for matches
     for bill_path in list_dir(bills_folder):
+        url = sharepoint_url_map.get(bill_path) if sharepoint_url_map else None
+        url_suffix = f" | SharePoint: {url}" if url else ""
+
         if not bill_path.is_file() or bill_path.suffix.lower() != ".pdf":
-            # TODO: Add warning and save into QA log with Sharepoint link
             log.warning(
-                f"Skipped bill file because it is not a PDF file: {bill_path}",
+                f"Skipped bill file because it is not a PDF file: {bill_path}{url_suffix}",
                 extra={"qa_report": True},
             )
             continue
@@ -59,9 +62,8 @@ def merge_bills_and_payments(
             sap = parse_bill_filename(bill_path.stem)
         except ParseSAPIdException:
             move_file(bill_path, qa_folder)
-            # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match
             log.error(
-                f"Failed to merge bill file {bill_path}: unexpected name format, moved to QA folder",
+                f"Failed to merge bill file {bill_path}: unexpected name format, moved to QA folder{url_suffix}",
                 extra={"qa_report": True},
             )
             continue
@@ -69,8 +71,7 @@ def merge_bills_and_payments(
         matched_payment: Path | None = payment_map.get(sap)
 
         if not matched_payment:
-            # TODO: When the integeration with Sharepoint is ready, add link to the bill_path that does not match
-            log.error(f"No matching payment found for bill {bill_path}")
+            log.error(f"No matching payment found for bill {bill_path}{url_suffix}")
             continue
 
         output_folder_name = f"{sap.year}{FolderName.YEAR_FOLDER_SUFFIX}"

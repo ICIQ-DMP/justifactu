@@ -36,8 +36,8 @@ class InputLocation(str, Enum):
 class FolderName(str, Enum):
     """Named folder paths used across the pipeline."""
 
-    BILLS_INPUT = "FACTURES"
-    PAYMENTS_INPUT = "Remeses"
+    BILLS_INPUT = "FACTURES1"
+    PAYMENTS_INPUT = "Remeses2"
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"

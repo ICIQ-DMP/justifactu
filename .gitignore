@@ -208,3 +208,5 @@ __marimo__/
 
 # Own rules
 .idea
+src/justifactu/service
+.tokensave

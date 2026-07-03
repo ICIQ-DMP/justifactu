@@ -41,20 +41,15 @@ def parse_sap_id_from_bill(pdf_path: Path) -> str:
 
     for page in reader.pages:
         text = page.extract_text()
-        print("THIS IS THE TEXT")
-        print(text)
         if not text:
             continue
 
-        match = pattern.findall(text)
-        print("this is match 1:2")
-        # print(match[0][1:3])
-        print("this is match")
-        print(match)
+        match = pattern.search(text)
+
         if not match:
             continue
 
-        return "".join(match[0][1:3])
+        return match.group("year") + match.group("sapid")
 
     raise ParseSAPIdException(f"No SAP ID found in {pdf_path}")
 

@@ -98,7 +98,10 @@ class _VaultClient:
         self._session = requests.Session()
         ca_cert = _read_credential("VAULT_CACERT").strip()
         if ca_cert:
-            self._session.verify = ca_cert
+            ca_cert_path = Path(ca_cert)
+            if not ca_cert_path.is_absolute():
+                ca_cert_path = ROOT_FOLDER / ca_cert_path
+            self._session.verify = str(ca_cert_path)
         elif _read_credential("VAULT_SKIP_VERIFY").lower() in ("1", "true", "yes"):
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             self._session.verify = False

@@ -50,9 +50,7 @@ def parse_sap_id_from_string(string: str) -> SAP_ID:
     matches = re.findall(pattern, string)
 
     if len(matches) > 1:
-        raise ParseSAPIdException(
-            f"Found multiple matches for {string}, assuming first match"
-        )
+        log.warning(f"Found multiple matches for {string}, assuming first match")
 
     elif len(matches) == 0:
         log.error(f"No matches found for {string}")

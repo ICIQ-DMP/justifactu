@@ -45,6 +45,7 @@ def merge_bills_and_payments(
     payment_map = index_payments(index_folder(payments_folder))
     successful_payments: set[Path] = set()
     qa_folder = merge_folder / FolderName.QA_ERRORS
+    qa_folder.mkdir(parents=True, exist_ok=True)
 
     # Process bills and look for matches
     for bill_path in list_dir(bills_folder):
@@ -74,11 +75,13 @@ def merge_bills_and_payments(
             log.error(f"No matching payment found for bill {bill_path}{url_suffix}")
             continue
 
-        output_folder_name = f"{sap.year}{FolderName.YEAR_FOLDER_SUFFIX}"
+        output_folder_name = f"{sap.year}{FolderName.YEAR_FOLDER_SUFFIX.value}"
         output_folder_path = merge_folder / output_folder_name
         output_folder_path.mkdir(parents=True, exist_ok=True)
 
-        output_path = output_folder_path / f"{sap}{FileSuffix.MERGED_BILL_PAYMENT}.pdf"
+        output_path = (
+            output_folder_path / f"{sap}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+        )
         try:
             log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
             merge_pdfs(bill_path, matched_payment, output_path)
@@ -93,7 +96,7 @@ def cleanup_processed_files(
     bill_path: Path, matched_payment: Path, delete_processed: bool
 ) -> None:
     """Renames the payment file and optionally deletes the bill file"""
-    new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT}"
+    new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT.value}"
     renamed_path = change_file_name(matched_payment, new_name)
 
     if renamed_path is None:

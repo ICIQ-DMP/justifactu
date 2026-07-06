@@ -36,7 +36,7 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
             log.warning(f"Skipping {payment_path} because it is not a PDF")
             continue
 
-        if payment_path.stem.endswith(FileSuffix.PROCESSED_PAYMENT):
+        if payment_path.stem.endswith(FileSuffix.PROCESSED_PAYMENT.value):
             log.info(f"Skipping {payment_path} because it is already processed")
             continue
 

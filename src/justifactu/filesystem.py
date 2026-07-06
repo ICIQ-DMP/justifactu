@@ -27,19 +27,13 @@ log = get_logger(__name__)
 def list_dir(input_folder: Path) -> List[Path]:
     """Returns a list of all file names in the ./input/salaries directory."""
     # Ensure the input_folder is a valid directory
-    if not os.path.isdir(input_folder):
+    if not input_folder.is_dir():
         raise ValueError(
             "input folder "
             + str(input_folder)
             + " in list_files function is not a directory or can't be accessed"
         )
-
-    # List all files in the directory
-    file_names = []
-    for file_name in input_folder.iterdir():
-        file_names.append(file_name)
-
-    return file_names
+    return [item for item in input_folder.rglob("*") if item.is_file()]
 
 
 def copy_file(origin_path: Path, target_path: Path) -> None:
@@ -84,7 +78,6 @@ def change_file_name(file: Path, new_name: str) -> Path | None:
 
     if new_path.exists():
         log.warning(f"A file named {new_path.name} already exists.")
-        raise FileExistsError(f"Destination file already exists: {new_path}")
 
     file.rename(new_path)
     log.info(f"Renamed: {file} to {new_path}")

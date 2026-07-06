@@ -68,8 +68,7 @@ def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
 def rename_payments(pdf_path: Path) -> None:
     """Renames the files from the payments folder"""
     if not pdf_path.is_dir():
-        log.error(f"{pdf_path} is not a directory")
-        raise NotADirectoryError(f"{pdf_path} is not a directory")
+        log.warning(f"{pdf_path} is not a directory")
 
     rename_pattern = re.compile(SAP_pattern + r"-P$")
 

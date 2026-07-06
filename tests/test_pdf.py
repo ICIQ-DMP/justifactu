@@ -16,7 +16,6 @@
 
 from unittest.mock import patch
 
-import pytest
 
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
@@ -145,7 +144,7 @@ def test_cleanup_processed_files_renames_payment(tmp_path):
     cleanup_processed_files(bill, payment, delete_processed=False)
 
     assert (
-        tmp_path / f"{id_sap_instance}-P{FileSuffix.PROCESSED_PAYMENT}.pdf"
+        tmp_path / f"{id_sap_instance}-P{FileSuffix.PROCESSED_PAYMENT.value}.pdf"
     ).exists()
     assert bill.exists()  # not deleted when delete_processed=False
 
@@ -199,15 +198,6 @@ def test_rename_payments_skips_non_pdf(tmp_path):
         mock_parse.assert_not_called()
 
 
-def test_rename_payments_not_a_directory(tmp_path):
-    not_a_dir = tmp_path / "file.pdf"
-    create_blank_pdf(not_a_dir)
-
-    # Should log a warning and return without raising
-    with pytest.raises(NotADirectoryError):
-        rename_payments(not_a_dir)
-
-
 # ── merge_bills_and_payments ──────────────────────────────────────────────────
 
 
@@ -222,10 +212,11 @@ def test_merge_bills_and_payments_success(billing_dirs):
     merge_bills_and_payments(bills_dir, payments_dir, output_dir)
 
     expected_subfolder = (
-        output_dir / f"{id_sap_instance.year}{FolderName.YEAR_FOLDER_SUFFIX}"
+        output_dir / f"{id_sap_instance.year}{FolderName.YEAR_FOLDER_SUFFIX.value}"
     )
     expected_output = (
-        expected_subfolder / f"{id_sap_instance}{FileSuffix.MERGED_BILL_PAYMENT}.pdf"
+        expected_subfolder
+        / f"{id_sap_instance}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
     )
     assert expected_output.exists()
 

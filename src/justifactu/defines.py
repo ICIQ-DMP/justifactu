@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
-from enum import Enum
+from enum import Enum, StrEnum
 from pathlib import Path
 
 ROOT_FOLDER: Path = Path(__file__).resolve().parent.parent.parent
@@ -26,18 +26,18 @@ NOW_DATA = datetime.datetime.now()
 NOW = NOW_DATA.strftime(DATETIME_FORMAT)
 
 
-class InputLocation(str, Enum):
+class InputLocation(StrEnum):
     """Input location argument possible values."""
 
     SHAREPOINT = "sharepoint"
     LOCAL = "local"
 
 
-class FolderName(str, Enum):
+class FolderName(StrEnum):
     """Named folder paths used across the pipeline."""
 
-    BILLS_INPUT = "FACTURES1"
-    PAYMENTS_INPUT = "Remeses2"
+    BILLS_INPUT = "FACTURES_prova"
+    PAYMENTS_INPUT = "Remeses_prova"
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
@@ -45,14 +45,14 @@ class FolderName(str, Enum):
     SHAREPOINT_OUTPUT_PATH = "justifactu/_output"
 
 
-class FileSuffix(str, Enum):
+class FileSuffix(StrEnum):
     """Named file suffixes used across the pipeline."""
 
     MERGED_BILL_PAYMENT = "_F_P"
     PROCESSED_PAYMENT = "_merged"
 
 
-class SecretNames(str, Enum):
+class SecretNames(StrEnum):
     """Available secret names."""
 
     # sharepoint

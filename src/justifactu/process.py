@@ -75,12 +75,13 @@ def merge_bills_and_payments(
             log.error(f"No matching payment found for bill {bill_path}{url_suffix}")
             continue
 
-        output_folder_name = f"{sap.year}{FolderName.YEAR_FOLDER_SUFFIX.value}"
+        output_folder_name = sap.year + FolderName.YEAR_FOLDER_SUFFIX
         output_folder_path = merge_folder / output_folder_name
         output_folder_path.mkdir(parents=True, exist_ok=True)
 
         output_path = (
-            output_folder_path / f"{sap}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+            output_folder_path
+            / f"{sap.__str__()} + {FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
         )
         try:
             log.info(f"Merging {bill_path.name} with {matched_payment.name}...")

@@ -62,10 +62,10 @@ def main() -> None:
         #    Path(FolderName.SHAREPOINT_INPUT_PATH),
         #    input_folder,
         # )
-    bills_folder = input_folder / FolderName.BILLS_INPUT
-    payments_folder = input_folder / FolderName.PAYMENTS_INPUT
+    bills_folder = input_folder / FolderName.BILLS_INPUT.value
+    payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
     bills_plus_payments_folder = (
-        input_folder.parent / "_output" / FolderName.MERGED_OUTPUT
+        input_folder.parent / "_output" / FolderName.MERGED_OUTPUT.value
     )
 
     sharepoint_url_map: dict[Path, str] | None = None

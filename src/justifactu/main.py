@@ -22,6 +22,7 @@ from justifactu.logger import (
     configure_logging_from_settings,
     get_logger,
 )
+from justifactu.filesystem import copy_file
 from justifactu.process import merge_bills_and_payments
 from justifactu.pdf import rename_payments
 from justifactu.custom_except import MainCriticalError
@@ -37,8 +38,9 @@ logger = get_logger(__name__)
 
 def main() -> None:
     """"""
+    qa_report_path = ADMIN_LOG_FOLDER / (NOW + "_qa_report.log")
     configure_logging_from_settings(
-        moved_files_log_file=ADMIN_LOG_FOLDER / (NOW + "_qa_report.log"),
+        moved_files_log_file=qa_report_path,
     )
 
     args = process_parse_arguments()
@@ -94,6 +96,10 @@ def main() -> None:
         if args.location == InputLocation.SHAREPOINT:
             assert token_manager is not None
             assert drive_id is not None
+
+            qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
+            copy_file(qa_report_path, qa_folder)
+
             upload_folder_recursive(
                 token_manager,
                 drive_id,

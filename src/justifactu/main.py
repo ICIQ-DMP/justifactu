@@ -84,13 +84,21 @@ def main() -> None:
     logger.info("Starting...")
 
     try:
-        rename_payments(payments_folder)
+        remote_payments_folder = (
+            Path(FolderName.SHAREPOINT_INPUT_PATH) / FolderName.PAYMENTS_INPUT.value
+        )
+        rename_payments(
+            payments_folder, token_manager, drive_id, remote_payments_folder
+        )
         merge_bills_and_payments(
             bills_folder,
             payments_folder,
             bills_plus_payments_folder,
             delete_processed=True,
             sharepoint_url_map=sharepoint_url_map,
+            token_manager=token_manager,
+            drive_id=drive_id,
+            remote_folder=remote_payments_folder,
         )
 
         if args.location == InputLocation.SHAREPOINT:

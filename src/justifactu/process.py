@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
+from urllib.error import HTTPError
 
 from .bills import parse_bill_filename
 from .custom_except import (
@@ -24,10 +25,12 @@ from .custom_except import (
 )
 
 from .defines import FolderName, FileSuffix
-from .filesystem import list_dir, move_file, change_file_name, index_folder
+from .filesystem import list_dir, move_file, index_folder
 from .logger import get_logger
 from .payments import index_payments
 from .pdf import merge_pdfs
+from .sharepoint import rename_with_remote
+from .token_manager import TokenManager
 
 log = get_logger(__name__)
 
@@ -38,6 +41,9 @@ def merge_bills_and_payments(
     merge_folder: Path,
     delete_processed: bool = False,
     sharepoint_url_map: dict[Path, str] | None = None,
+    token_manager: TokenManager | None = None,
+    drive_id: str | None = None,
+    remote_folder: Path | None = None,
 ) -> None:
     """Merges bills and payments and saves them into merge_folder"""
 
@@ -87,26 +93,42 @@ def merge_bills_and_payments(
             merge_pdfs(bill_path, matched_payment, output_path)
             # TODO upload output path to sharepoint. Should it be per file or whole folder?
             successful_payments.add(matched_payment)
-            cleanup_processed_files(bill_path, matched_payment, delete_processed)
+            cleanup_processed_files(
+                bill_path,
+                matched_payment,
+                delete_processed,
+                token_manager,
+                drive_id,
+                remote_folder,
+            )
         except MergingBillWithPaymentError as e:
             log.exception(f"Failed to process {bill_path.name}: {e}")
 
 
 def cleanup_processed_files(
-    bill_path: Path, matched_payment: Path, delete_processed: bool
+    bill_path: Path,
+    matched_payment: Path,
+    delete_processed: bool,
+    token_manager: TokenManager | None = None,
+    drive_id: str | None = None,
+    remote_folder: Path | None = None,
 ) -> None:
     """Renames the payment file and optionally deletes the bill file"""
     new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT.value}"
-    renamed_path = change_file_name(matched_payment, new_name)
+    renamed_path = rename_with_remote(
+        matched_payment, new_name, token_manager, drive_id, remote_folder
+    )
+    try:
+        if renamed_path is None:
+            log.error(f"Failed to rename processed payment file {matched_payment}")
+        else:
+            log.info(f"Renamed processed payment file {renamed_path.name}")
 
-    if renamed_path is None:
-        log.error(f"Failed to rename processed payment file {matched_payment}")
-    else:
-        log.info(f"Renamed processed payment file {renamed_path.name}")
-
-    if delete_processed:
-        try:
-            bill_path.unlink()
-            log.info(f"Deleted: {bill_path.name}")
-        except FileDeletionError as e:
-            log.exception(f"Failed to delete {bill_path.name}: {e}")
+        if delete_processed:
+            try:
+                bill_path.unlink()
+                log.info(f"Deleted: {bill_path.name}")
+            except FileDeletionError as e:
+                log.exception(f"Failed to delete {bill_path.name}: {e}")
+    except HTTPError as e:
+        log.error(f"Failed to rename processed payment file {matched_payment}: {e}")

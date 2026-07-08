@@ -16,6 +16,7 @@
 
 import re
 from pathlib import Path
+from urllib.error import HTTPError
 
 from pypdf import PdfReader, PdfWriter
 
@@ -25,8 +26,10 @@ from .custom_except import (
     UnexpectedRenamingError,
 )
 from .SAP_ID import pattern as SAP_pattern
-from .filesystem import change_file_name
+
 from .logger import get_logger
+from .sharepoint import rename_with_remote
+from .token_manager import TokenManager
 
 log = get_logger(__name__)
 
@@ -65,7 +68,12 @@ def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
         writer.close()
 
 
-def rename_payments(pdf_path: Path) -> None:
+def rename_payments(
+    pdf_path: Path,
+    token_manager: TokenManager | None = None,
+    drive_id: str | None = None,
+    remote_folder: Path | None = None,
+) -> None:
     """Renames the files from the payments folder"""
     if not pdf_path.is_dir():
         log.warning(f"{pdf_path} is not a directory")
@@ -88,18 +96,20 @@ def rename_payments(pdf_path: Path) -> None:
 
             sap_id = parse_sap_id_from_bill(entry)
 
-            updated_entry = change_file_name(entry, f"{sap_id}-P")
+            updated_entry = rename_with_remote(
+                entry, f"{sap_id}-P", token_manager, drive_id, remote_folder
+            )
 
             if not updated_entry:
                 continue
 
             log.info(f"File name changed to: {updated_entry.name}")
 
-        except ParseSAPIdException as e:
-            log.error(f"Failed to parse SAP ID from {entry}: {e}")
+        except (ParseSAPIdException, HTTPError) as e:
+            log.error(f"Failed to rename {entry}: {e}")
 
         except SkippedPdfRenamingInvalidSapId:
-            log.warning(f"Skipped {entry.name} due to invalid value")
+            log.warning(f"Skipped {entry.name} due to invalid SAP id value")
 
         except UnexpectedRenamingError as e:
             log.exception(f"Unexpected error processing {entry.name}: {e}")

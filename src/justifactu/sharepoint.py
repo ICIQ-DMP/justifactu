@@ -26,6 +26,7 @@ from urllib.parse import quote
 import requests
 from requests.exceptions import HTTPError
 
+from .filesystem import change_file_name
 from .token_manager import TokenManager, get_token_manager
 from .custom_except import BadSharepointListUpdateRequestError
 from .defines import SharepointListFields
@@ -452,6 +453,21 @@ def build_file_url_map(
     }
 
 
+def rename_remote_item(
+    token_manager: TokenManager,
+    drive_id: str | None,
+    remote_path: Path | None,
+    new_name: str,
+) -> None:
+    url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{remote_path}:"
+    headers = {
+        "Authorization": f"Bearer {token_manager.get_token()}",
+        "Content-Type": "application/json",
+    }
+    response = requests.patch(url, headers=headers, json={"name": new_name})
+    response.raise_for_status()
+
+
 def _connect_sharepoint() -> tuple[TokenManager, str, str]:
     """Authenticate with SharePoint and return the connection handles.
 
@@ -464,3 +480,19 @@ def _connect_sharepoint() -> tuple[TokenManager, str, str]:
     site_id = get_site_id(token_manager, sharepoint_domain, site_name)
     drive_id = get_drive_id(token_manager, site_id, drive_name="Documents")
     return token_manager, site_id, drive_id
+
+
+def rename_with_remote(
+    file: Path,
+    new_name: str,
+    token_manager: TokenManager | None,
+    drive_id: str | None,
+    remote_folder: Path | None,
+) -> Path | None:
+    if token_manager is not None:
+        assert drive_id is not None
+        assert remote_folder is not None
+        rename_remote_item(
+            token_manager, drive_id, remote_folder / file.name, new_name + file.suffix
+        )
+    return change_file_name(file, new_name)

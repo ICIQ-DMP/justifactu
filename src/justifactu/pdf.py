@@ -16,7 +16,7 @@
 
 import re
 from pathlib import Path
-from urllib.error import HTTPError
+from requests.exceptions import HTTPError
 
 from pypdf import PdfReader, PdfWriter
 
@@ -96,8 +96,13 @@ def rename_payments(
 
             sap_id = parse_sap_id_from_bill(entry)
 
+            relative_dir = entry.parent.relative_to(pdf_path)
+            file_remote_folder = (
+                remote_folder / relative_dir if remote_folder is not None else None
+            )
+
             updated_entry = rename_with_remote(
-                entry, f"{sap_id}-P", token_manager, drive_id, remote_folder
+                entry, f"{sap_id}-P", token_manager, drive_id, file_remote_folder
             )
 
             if not updated_entry:

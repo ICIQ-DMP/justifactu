@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
-from urllib.error import HTTPError
+from requests.exceptions import HTTPError
 
 from .bills import parse_bill_filename
 from .custom_except import (
@@ -115,20 +115,21 @@ def cleanup_processed_files(
 ) -> None:
     """Renames the payment file and optionally deletes the bill file"""
     new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT.value}"
-    renamed_path = rename_with_remote(
-        matched_payment, new_name, token_manager, drive_id, remote_folder
-    )
     try:
+        renamed_path = rename_with_remote(
+            matched_payment, new_name, token_manager, drive_id, remote_folder
+        )
+
         if renamed_path is None:
             log.error(f"Failed to rename processed payment file {matched_payment}")
         else:
             log.info(f"Renamed processed payment file {renamed_path.name}")
 
-        if delete_processed:
-            try:
-                bill_path.unlink()
-                log.info(f"Deleted: {bill_path.name}")
-            except FileDeletionError as e:
-                log.exception(f"Failed to delete {bill_path.name}: {e}")
+            if delete_processed:
+                try:
+                    bill_path.unlink()
+                    log.info(f"Deleted: {bill_path.name}")
+                except FileDeletionError as e:
+                    log.exception(f"Failed to delete {bill_path.name}: {e}")
     except HTTPError as e:
         log.error(f"Failed to rename processed payment file {matched_payment}: {e}")

@@ -37,7 +37,7 @@ class FolderName(StrEnum):
     """Named folder paths used across the pipeline."""
 
     BILLS_INPUT = "FACTURES1"
-    PAYMENTS_INPUT = "Remeses1"
+    PAYMENTS_INPUT = "Remeses_prova"
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"

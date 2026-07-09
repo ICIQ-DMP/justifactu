@@ -26,6 +26,7 @@ from .custom_except import (
     UnexpectedRenamingError,
 )
 from .SAP_ID import pattern as SAP_pattern
+from .defines import FileSuffix
 
 from .logger import get_logger
 from .sharepoint import rename_with_remote
@@ -78,8 +79,9 @@ def rename_payments(
     if not pdf_path.is_dir():
         log.warning(f"{pdf_path} is not a directory")
 
-    rename_pattern = re.compile(SAP_pattern + r"-P$")
-
+    rename_pattern = re.compile(
+        SAP_pattern + r"-P(" + re.escape(FileSuffix.PROCESSED_PAYMENT.value) + r")?$"
+    )
     for entry in list(pdf_path.rglob("*")):
         if entry.is_dir():
             continue

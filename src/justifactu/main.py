@@ -16,16 +16,18 @@
 from pathlib import Path
 
 from justifactu.arguments import process_parse_arguments
-from justifactu.defines import NOW, InputLocation, FolderName, ROOT_FOLDER
+from justifactu.defines import NOW, InputLocation, FolderName, ROOT_FOLDER, SecretNames
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
     get_logger,
 )
 from justifactu.filesystem import copy_file
+from justifactu.mail import send_qa_report_mail
 from justifactu.process import merge_bills_and_payments
 from justifactu.pdf import rename_payments
 from justifactu.custom_except import MainCriticalError
+from justifactu.secret import read_secret
 from justifactu.sharepoint import (
     _connect_sharepoint,
     build_file_url_map,
@@ -119,6 +121,13 @@ def main() -> None:
 
     except MainCriticalError as e:
         logger.critical(e)
+
+    finally:
+        send_qa_report_mail(
+            to_email=read_secret(SecretNames.SMTP_ADMIN_EMAIL.value),
+            message="Adjuntem el informe QA de l'execució.",
+            qa_report_path=qa_report_path,
+        )
 
 
 if __name__ == "__main__":

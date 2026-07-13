@@ -19,6 +19,7 @@
 import smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
+from pathlib import Path
 
 from .date import unparse_date
 from .defines import SecretNames
@@ -188,3 +189,19 @@ def mail_process(
     send_mail_authenticated(author, subject, body)
 
     log.info("Email sent. Process complete.")
+
+
+def send_qa_report_mail(to_email: str, message: str, qa_report_path: Path) -> None:
+    """Send the QA report generated during a run, together with a custom message.
+
+    Args:
+        to_email: Recipient email address.
+        message: Free-text message to include above the report content.
+        qa_report_path: Path to the QA report log file generated during the run.
+    """
+    subject = f"Justifactu - QA report {qa_report_path.stem}"
+    qa_report_text = qa_report_path.read_text()
+    body = f"{message}\n\n--- QA Report ---\n{qa_report_text}"
+
+    send_mail_authenticated(to_email, subject, body)
+    log.info("QA report email sent.")

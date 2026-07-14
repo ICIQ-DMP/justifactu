@@ -123,11 +123,14 @@ def main() -> None:
         logger.critical(e)
 
     finally:
-        send_qa_report_mail(
-            to_email=read_secret(SecretNames.SMTP_ADMIN_EMAIL.value),
-            message="Adjuntem el informe QA de l'execució.",
-            qa_report_path=qa_report_path,
-        )
+        try:
+            send_qa_report_mail(
+                to_email=read_secret(SecretNames.SMTP_ADMIN_EMAIL.value),
+                message="Adjuntem el informe QA de l'execució.",
+                qa_report_path=qa_report_path,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send QA report email: {e}")
 
 
 if __name__ == "__main__":

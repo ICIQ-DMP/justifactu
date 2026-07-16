@@ -446,11 +446,21 @@ def build_file_url_map(
         Dict mapping each local file path to its SharePoint ``webUrl``.
     """
     items = list_folder_contents(token_manager, drive_id, remote_folder)
-    return {
-        local_folder / item["name"]: item["webUrl"]
-        for item in items
-        if "webUrl" in item
-    }
+    result: dict[Path, str] = {}
+    items = list_folder_contents(token_manager, drive_id, remote_folder)
+    for item in items:
+        if "folder" in item:
+            result.update(
+                build_file_url_map(
+                    token_manager,
+                    drive_id,
+                    remote_folder / item["name"],
+                    local_folder / item["name"],
+                )
+            )
+        elif "webUrl" in item:
+            result[local_folder / item["name"]] = item["webUrl"]
+    return result
 
 
 def rename_remote_item(

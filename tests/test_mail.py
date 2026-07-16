@@ -17,6 +17,7 @@
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
+# from justifactu.defines import SecretNames
 from justifactu.mail import (
     send_mail,
     build_result_mail_body,
@@ -24,6 +25,9 @@ from justifactu.mail import (
     send_mail_authenticated,
     mail_process,
 )
+
+# from justifactu.secret import read_secret
+
 
 # ── send_mail ─────────────────────────────────────────────────────────────────
 

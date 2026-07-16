@@ -92,13 +92,17 @@ def merge_bills_and_payments(
             log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
             merge_pdfs(bill_path, matched_payment, output_path)
             successful_payments.add(matched_payment)
+            relative_dir = matched_payment.parent.relative_to(payments_folder)
+            payment_remote_folder = (
+                remote_folder / relative_dir if remote_folder is not None else None
+            )
             cleanup_processed_files(
                 bill_path,
                 matched_payment,
                 delete_processed,
                 token_manager,
                 drive_id,
-                remote_folder,
+                payment_remote_folder,
             )
         except MergingBillWithPaymentError as e:
             log.exception(f"Failed to process {bill_path.name}: {e}")

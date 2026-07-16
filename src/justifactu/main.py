@@ -54,7 +54,6 @@ def main() -> None:
     site_id = None
     drive_id = None
 
-    # TODO comentar implementació amb Aleix
     if args.location == InputLocation.LOCAL:
         input_folder = args.input_location or default_input_folder
     else:

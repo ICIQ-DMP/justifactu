@@ -42,7 +42,7 @@ def main() -> None:
     """"""
     qa_report_path = ADMIN_LOG_FOLDER / (NOW + "_qa_report.log")
     configure_logging_from_settings(
-        moved_files_log_file=qa_report_path,
+        qa_files_log_file=qa_report_path,
     )
 
     args = process_parse_arguments()

@@ -69,7 +69,7 @@ def merge_bills_and_payments(
             sap = parse_bill_filename(bill_path.stem)
         except ParseSAPIdException:
             log.error(
-                f"Failed to merge bill file {bill_path}: unexpected name format, moved to QA folder{url_suffix}",
+                f"Failed to merge bill file {bill_path}: unexpected name format. {url_suffix}",
                 extra={"qa_report": True},
             )
             continue

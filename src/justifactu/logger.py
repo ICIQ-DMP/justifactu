@@ -116,7 +116,7 @@ class SecretsFilter(logging.Filter):
         return True
 
 
-class MovedFilesFilter(logging.Filter):
+class QAFilesFilter(logging.Filter):
     def __init__(self) -> None:
         super().__init__()
 
@@ -129,7 +129,7 @@ def setup_logging(
     user_report_file: Optional[str | Path] = None,
     admin_log_file: Optional[str | Path] = None,
     supervisor_log_file: Optional[str | Path] = None,
-    moved_files_log_file: Optional[str | Path] = None,
+    qa_files_log_file: Optional[str | Path] = None,
     secrets: list[str] | None = None,
 ) -> None:
     # Default level is DEBUG
@@ -138,7 +138,7 @@ def setup_logging(
 
     handlers: list[logging.Handler] = []
     secrets_filter = SecretsFilter(secrets)
-    moved_files_filter = MovedFilesFilter()
+    qa_files_filter = QAFilesFilter()
 
     # ---- console (Rich)
     console = RichHandler(
@@ -170,13 +170,13 @@ def setup_logging(
             file_handler.setLevel(log_file_i[1])
             handlers.append(file_handler)
 
-    if moved_files_log_file:
-        path = Path(moved_files_log_file)
+    if qa_files_log_file:
+        path = Path(qa_files_log_file)
         path.parent.mkdir(parents=True, exist_ok=True)
         moved_handler = logging.FileHandler(path, encoding="utf-8")
         moved_handler.setFormatter(common_formatter)
         moved_handler.addFilter(secrets_filter)
-        moved_handler.addFilter(moved_files_filter)
+        moved_handler.addFilter(qa_files_filter)
         moved_handler.setLevel(logging.WARNING)
         handlers.append(moved_handler)
 
@@ -228,7 +228,7 @@ def configure_logging_from_settings(
     user_report_file: Optional[str | Path] = None,
     admin_log_file: Optional[str | Path] = None,
     supervisor_log_file: Optional[str | Path] = None,
-    moved_files_log_file: Optional[str | Path] = None,
+    qa_files_log_file: Optional[str | Path] = None,
     secrets: Optional[list[str]] = None,
 ) -> None:
 
@@ -243,6 +243,6 @@ def configure_logging_from_settings(
         user_report_file=user_report_file,
         admin_log_file=admin_log_file,
         supervisor_log_file=supervisor_log_file,
-        moved_files_log_file=moved_files_log_file,
+        qa_files_log_file=qa_files_log_file,
         secrets=secrets,
     )  # Preventive creation of log for logging the loading of settings

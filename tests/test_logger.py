@@ -19,7 +19,7 @@ from justifactu.logger import configure_logging_from_settings, get_logger
 
 def test_qa_report_captures_tagged_records_at_any_level(tmp_path):
     qa_report_path = tmp_path / "qa_report.log"
-    configure_logging_from_settings(moved_files_log_file=qa_report_path)
+    configure_logging_from_settings(qa_files_log_file=qa_report_path)
     log = get_logger("test_qa_report")
 
     log.warning("tagged warning", extra={"qa_report": True})

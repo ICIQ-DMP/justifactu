@@ -25,7 +25,7 @@ from .custom_except import (
 )
 
 from .defines import FolderName, FileSuffix
-from .filesystem import list_dir, move_file, index_folder
+from .filesystem import list_dir, index_folder
 from .logger import get_logger
 from .payments import index_payments
 from .pdf import merge_pdfs
@@ -68,7 +68,6 @@ def merge_bills_and_payments(
         try:
             sap = parse_bill_filename(bill_path.stem)
         except ParseSAPIdException:
-            move_file(bill_path, qa_folder)
             log.error(
                 f"Failed to merge bill file {bill_path}: unexpected name format, moved to QA folder{url_suffix}",
                 extra={"qa_report": True},

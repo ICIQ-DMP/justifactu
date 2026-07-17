@@ -108,6 +108,8 @@ def main() -> None:
 
             qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
             copy_file(qa_report_path, qa_folder)
+            regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
+            copy_file(regular_log_path, qa_folder)
 
             upload_folder_recursive(
                 token_manager,
@@ -124,7 +126,7 @@ def main() -> None:
     finally:
         try:
             send_qa_report_mail(
-                to_email=read_secret(SecretNames.SMTP_ADMIN_EMAIL.value),
+                to_email=read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
                 message="Adjuntem el informe QA de l'execució.",
                 qa_report_path=qa_report_path,
             )

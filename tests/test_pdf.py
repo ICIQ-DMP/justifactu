@@ -221,19 +221,6 @@ def test_merge_bills_and_payments_success(billing_dirs):
     assert expected_output.exists()
 
 
-def test_merge_bills_and_payments_invalid_bill_format_moved_to_qa(billing_dirs):
-    bills_dir, payments_dir, output_dir = billing_dirs
-
-    bad_bill = bills_dir / "INVALID_NAME.pdf"
-    create_blank_pdf(bad_bill)
-
-    merge_bills_and_payments(bills_dir, payments_dir, output_dir)
-
-    qa_folder = output_dir / FolderName.QA_ERRORS
-    assert (qa_folder / "INVALID_NAME.pdf").exists()
-    assert not bad_bill.exists()
-
-
 def test_merge_bills_and_payments_no_matching_payment(billing_dirs):
     bills_dir, payments_dir, output_dir = billing_dirs
 

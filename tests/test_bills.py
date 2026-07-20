@@ -18,7 +18,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from justifactu.pdf import parse_sap_id_from_bill
+from justifactu.bills import parse_sap_id_from_bill
 from justifactu.custom_except import ParseSAPIdException
 
 sap_id = "2034567890"
@@ -36,7 +36,7 @@ def test_parse_sap_id_from_bill_found(tmp_path):
     mock_reader = MagicMock()
     mock_reader.pages = [mock_page]
 
-    with patch("justifactu.pdf.PdfReader", return_value=mock_reader):
+    with patch("justifactu.bills.PdfReader", return_value=mock_reader):
         result = parse_sap_id_from_bill(pdf_path)
 
     assert result == sap_id
@@ -51,7 +51,7 @@ def test_parse_sap_id_from_bill_found_without_dot(tmp_path):
     mock_reader = MagicMock()
     mock_reader.pages = [mock_page]
 
-    with patch("justifactu.pdf.PdfReader", return_value=mock_reader):
+    with patch("justifactu.bills.PdfReader", return_value=mock_reader):
         result = parse_sap_id_from_bill(pdf_path)
 
     assert result == sap_id
@@ -66,7 +66,7 @@ def test_parse_sap_id_from_bill_not_found_raises(tmp_path):
     mock_reader = MagicMock()
     mock_reader.pages = [mock_page]
 
-    with patch("justifactu.pdf.PdfReader", return_value=mock_reader):
+    with patch("justifactu.bills.PdfReader", return_value=mock_reader):
         with pytest.raises(ParseSAPIdException, match="No SAP ID found"):
             parse_sap_id_from_bill(pdf_path)
 
@@ -82,7 +82,7 @@ def test_parse_sap_id_from_bill_skips_empty_pages(tmp_path):
     mock_reader = MagicMock()
     mock_reader.pages = [empty_page, good_page]
 
-    with patch("justifactu.pdf.PdfReader", return_value=mock_reader):
+    with patch("justifactu.bills.PdfReader", return_value=mock_reader):
         result = parse_sap_id_from_bill(pdf_path)
 
     assert result == sap_id

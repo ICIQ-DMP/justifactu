@@ -14,8 +14,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import re
+from pathlib import Path
 
-from .SAP_ID import SAP_ID, pattern
+from pypdf import PdfReader
+from .SAP_ID import pattern as SAP_pattern
+
+from .SAP_ID import SAP_ID
 from .custom_except import (
     ParseSAPIdException,
 )
@@ -25,7 +29,7 @@ log = get_logger(__name__)
 
 
 def parse_bill_filename(bill_name: str) -> SAP_ID:
-    bill_patt = re.compile(rf"F\s{pattern}")
+    bill_patt = re.compile(rf"F\s{SAP_pattern}")
 
     match = bill_patt.fullmatch(bill_name)
 
@@ -35,3 +39,26 @@ def parse_bill_filename(bill_name: str) -> SAP_ID:
     bill_sap_id = SAP_ID(match.group("year") + match.group("sapid"))
 
     return bill_sap_id
+
+
+def parse_sap_id_from_bill(pdf_path: Path) -> str:
+    """Reads a PDF file to extract the SAP id"""
+    query_str = r"(Fra\.?\s+)" + SAP_pattern
+
+    pattern = re.compile(query_str, re.MULTILINE)
+
+    reader = PdfReader(pdf_path)
+
+    for page in reader.pages:
+        text = page.extract_text()
+        if not text:
+            continue
+
+        match = pattern.search(text)
+
+        if not match:
+            continue
+
+        return match.group("year") + match.group("sapid")
+
+    raise ParseSAPIdException(f"No SAP ID found in {pdf_path}")

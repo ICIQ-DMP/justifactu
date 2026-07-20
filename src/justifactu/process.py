@@ -139,7 +139,7 @@ def cleanup_processed_files(
         if delete_processed:
             try:
                 delete_file_remote(
-                    matched_payment, token_manager, drive_id, bill_remote_folder
+                    bill_path, token_manager, drive_id, bill_remote_folder
                 )
                 log.info(f"Deleted: {bill_path.name}")
             except FileDeletionError as e:

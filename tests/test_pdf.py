@@ -14,8 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import patch
-
+from unittest.mock import patch, MagicMock
 
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
@@ -135,45 +134,82 @@ def test_merge_pdfs_output_has_two_pages(tmp_path):
 # ── cleanup_processed_files ───────────────────────────────────────────────────
 
 
-def test_cleanup_processed_files_renames_payment(tmp_path):
+@patch("justifactu.process.rename_file_remote")
+def test_cleanup_processed_files_renames_payment(mock_rename, tmp_path):
     bill = tmp_path / f"F {id_sap_instance}.pdf"
     bill.touch()
     payment = tmp_path / f"{id_sap_instance}-P.pdf"
     payment.touch()
 
-    cleanup_processed_files(bill, payment, delete_processed=False)
+    cleanup_processed_files(
+        bill,
+        payment,
+        delete_processed=False,
+        token_manager=MagicMock(),
+        drive_id="drive-id",
+        payment_remote_folder=tmp_path,
+    )
 
-    assert (
-        tmp_path / f"{id_sap_instance}-P{FileSuffix.PROCESSED_PAYMENT.value}.pdf"
-    ).exists()
-    assert bill.exists()  # not deleted when delete_processed=False
+    mock_rename.assert_called_once_with(
+        payment,
+        f"{id_sap_instance}-P{FileSuffix.PROCESSED_PAYMENT.value}",
+        mock_rename.call_args.args[2],
+        "drive-id",
+        tmp_path,
+    )
+    assert bill.exists()
 
 
-def test_cleanup_processed_files_deletes_bill_when_requested(tmp_path):
+@patch("justifactu.process.delete_file_remote")
+@patch("justifactu.process.rename_file_remote")
+def test_cleanup_processed_files_deletes_bill_when_requested(
+    mock_rename, mock_delete, tmp_path
+):
     bill = tmp_path / f"F {id_sap_instance}.pdf"
     bill.touch()
     payment = tmp_path / f"{id_sap_instance}-P.pdf"
     payment.touch()
 
-    cleanup_processed_files(bill, payment, delete_processed=True)
+    cleanup_processed_files(
+        bill,
+        payment,
+        delete_processed=True,
+        token_manager=MagicMock(),
+        drive_id="drive-id",
+        payment_remote_folder=tmp_path,
+        bill_remote_folder=tmp_path,
+    )
 
-    assert not bill.exists()
+    mock_delete.assert_called_once_with(
+        bill, mock_delete.call_args.args[1], "drive-id", tmp_path
+    )
 
 
 # ── rename_payments ───────────────────────────────────────────────────────────
 
 
-def test_rename_payments_renames_pdf(tmp_path):
+@patch("justifactu.pdf.rename_file_remote")
+def test_rename_payments_renames_pdf(mock_rename, tmp_path):
     payments_dir = tmp_path / "Remeses"
     payments_dir.mkdir()
     pdf = payments_dir / "some_payment_document.pdf"
     create_blank_pdf(pdf)
 
     with patch("justifactu.pdf.parse_sap_id_from_bill", return_value=id_sap_instance):
-        rename_payments(payments_dir)
+        rename_payments(
+            payments_dir,
+            token_manager=MagicMock(),
+            drive_id="drive-id",
+            remote_folder=payments_dir,
+        )
 
-    assert (payments_dir / f"{id_sap_instance}-P.pdf").exists()
-    assert not pdf.exists()
+    mock_rename.assert_called_once_with(
+        pdf,
+        f"{id_sap_instance}-P",
+        mock_rename.call_args.args[2],
+        "drive-id",
+        payments_dir,
+    )
 
 
 def test_rename_payments_skips_already_renamed(tmp_path):
@@ -247,7 +283,8 @@ def test_merge_bills_and_payments_creates_output_folder(billing_dirs):
     assert output_dir.exists()
 
 
-def test_merge_bills_and_payments_delete_processed(billing_dirs):
+@patch("justifactu.process.cleanup_processed_files")
+def test_merge_bills_and_payments_delete_processed(mock_cleanup, billing_dirs):
     bills_dir, payments_dir, output_dir = billing_dirs
 
     bill = bills_dir / f"F {id_sap_instance}.pdf"
@@ -257,4 +294,4 @@ def test_merge_bills_and_payments_delete_processed(billing_dirs):
 
     merge_bills_and_payments(bills_dir, payments_dir, output_dir, delete_processed=True)
 
-    assert not bill.exists()
+    assert mock_cleanup.call_args.args[2] is True  # delete_processed passed through

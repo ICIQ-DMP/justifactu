@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
-from enum import Enum, StrEnum
+from enum import StrEnum
 from pathlib import Path
 
 ROOT_FOLDER: Path = Path(__file__).resolve().parent.parent.parent
@@ -75,24 +75,3 @@ class SecretNames(StrEnum):
     SMTP_USERNAME = "SMTP_USERNAME"
     SMTP_ADMIN_EMAIL = "SMTP_ADMIN_EMAIL"
     SMTP_OWNER_EMAIL = "SMTP_OWNER_EMAIL"
-
-
-class SharepointListFields(Enum):
-    """Maps semantic Python names to the internal SharePoint field names used by the Graph API."""
-
-    ID = "id"
-    REQUEST_TITLE = "Title"
-    NAF = "NAF"
-    TARGET_NAME = "Nomdelapersona"
-    TARGET_EMAIL = "PersonaEmail"
-    NIF = "DNI"
-    BEGIN = "DataInici"
-    END = "Datafinal"
-    AUTHOR_NAME = "Sol_x00b7_licitant"
-    AUTHOR_EMAIL = "SolicitantEmail"
-    MERGE_SALARY_BANKPROOF = "Fusi_x00f3_NominaiJustificantBan"
-    MERGE_RESULTS = "juntarpdfs"
-    MERGE_RLC_RNT = "Fusi_x00f3_RLCRNT"
-    WORKFLOW_STATE = "Estatworkflow"
-    RESULT = "Resultat"
-    ERROR_MESSAGE = "Missatge_x0020_error"

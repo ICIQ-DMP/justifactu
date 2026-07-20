@@ -21,21 +21,17 @@ import time
 import json
 from pathlib import Path
 from typing import cast
-from urllib.parse import quote
 
 import requests
 from requests.exceptions import HTTPError
 
 from .filesystem import change_file_name
 from .token_manager import TokenManager, get_token_manager
-from .custom_except import BadSharepointListUpdateRequestError
-from .defines import SharepointListFields
 from .logger import get_logger
 from .secret import read_secret
 
 # Type alias for a Microsoft Graph / SharePoint JSON field value
 SharepointListFieldType = str | int | bool | None
-SharepointItem = dict[SharepointListFields, SharepointListFieldType]
 
 log = get_logger(__name__)
 
@@ -314,92 +310,6 @@ def upload_folder_recursive(
             local_file = Path(root) / file_name
             remote_file = f"{sharepoint_current_path}/{file_name}".strip("/")
             upload_file(token_manager, drive_id, remote_file, local_file)
-
-
-def update_list_item_field(
-    item_id: int, updated_fields: dict[str, str]
-) -> SharepointItem:
-    """Patch one or more fields of a SharePoint list item.
-
-    Args:
-        item_id: Numeric identifier of the list item to update.
-        updated_fields: Dict mapping internal field names to new values.
-
-    Returns:
-        The updated item as a SharepointItem dict.
-
-    Raises:
-        BadSharepointListUpdateRequestError: If the PATCH request returns a non-200 status.
-    """
-    sharepoint_domain = read_secret("SHAREPOINT_DOMAIN")
-    site_name = read_secret("SITE_NAME")
-    list_name = read_secret("SHAREPOINT_LIST_NAME")
-
-    token_manager = get_token_manager()
-    access_token = token_manager.get_token()
-
-    site_id = get_site_id(token_manager, sharepoint_domain, site_name)
-
-    # Endpoint to patch the item's fields
-    patch_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}/items/{str(item_id)}/fields"
-
-    headers = {
-        "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-    }
-
-    response = requests.patch(patch_url, headers=headers, json=updated_fields)
-
-    if response.status_code != 200:
-        raise BadSharepointListUpdateRequestError(
-            f"Failed to update item {str(item_id)}: {response.status_code} - {response.text}"
-        )
-    else:
-        log.trace(f"Patched item {str(item_id)} with 200 OK: {response.text}")
-
-    return cast(SharepointItem, response.json())
-
-
-def get_parameters_from_list(
-    sharepoint_domain: str, site_name: str, list_name: str, job_id: int
-) -> SharepointItem:
-    """Fetch all known fields of a single list item by job ID.
-
-    Args:
-        sharepoint_domain: SharePoint tenant domain.
-        site_name: Name of the SharePoint site.
-        list_name: Name of the target list.
-        job_id: Numeric item identifier.
-
-    Returns:
-        SharepointItem containing all SharepointListFields values for the item.
-    """
-    token_manager = get_token_manager()
-    access_token = token_manager.get_token()
-    site_id = get_site_id(token_manager, sharepoint_domain, site_name)
-
-    # Build query in a clearer way: expand fields and select only needed fields
-    # Note: requests will correctly encode $ and parentheses in params
-    select_fields = ",".join(v.value for v in SharepointListFields)
-
-    params = {
-        "$expand": f"fields($select={select_fields})",
-        "$select": "fields,createdBy",
-    }
-
-    list_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{quote(list_name, safe='')}/items/{job_id}"
-    list_resp = requests.get(
-        list_url, headers={"Authorization": f"Bearer {access_token}"}, params=params
-    )
-    list_resp.raise_for_status()
-
-    # The request already targets /items/{job_id}, so raise_for_status() above
-    # guarantees we have the right item. No further ID verification is needed.
-    fields = list_resp.json()["fields"]
-    data: SharepointItem = {
-        field: fields.get(field.value) for field in SharepointListFields
-    }
-    return data
 
 
 def get_sharepoint_web_url(

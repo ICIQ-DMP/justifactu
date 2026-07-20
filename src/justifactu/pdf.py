@@ -29,7 +29,7 @@ from .SAP_ID import pattern as SAP_pattern
 from .defines import FileSuffix
 
 from .logger import get_logger
-from .sharepoint import rename_with_remote
+from .sharepoint import rename_file_remote
 from .token_manager import TokenManager
 
 log = get_logger(__name__)
@@ -103,14 +103,9 @@ def rename_payments(
                 remote_folder / relative_dir if remote_folder is not None else None
             )
 
-            updated_entry = rename_with_remote(
+            rename_file_remote(
                 entry, f"{sap_id}-P", token_manager, drive_id, file_remote_folder
             )
-
-            if not updated_entry:
-                continue
-
-            log.info(f"File name changed to: {updated_entry.name}")
 
         except (ParseSAPIdException, HTTPError) as e:
             log.error(f"Failed to rename {entry}: {e}")

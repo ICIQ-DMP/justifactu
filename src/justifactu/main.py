@@ -88,6 +88,10 @@ def main() -> None:
         remote_payments_folder = (
             Path(FolderName.SHAREPOINT_INPUT_PATH) / FolderName.PAYMENTS_INPUT.value
         )
+        remote_bills_folder = (
+            Path(FolderName.SHAREPOINT_INPUT_PATH) / FolderName.BILLS_INPUT.value
+        )
+
         rename_payments(
             payments_folder, token_manager, drive_id, remote_payments_folder
         )
@@ -99,7 +103,8 @@ def main() -> None:
             sharepoint_url_map=sharepoint_url_map,
             token_manager=token_manager,
             drive_id=drive_id,
-            remote_folder=remote_payments_folder,
+            remote_bills_folder=remote_bills_folder,
+            remote_payments_folder=remote_payments_folder,
         )
 
         if args.location == InputLocation.SHAREPOINT:

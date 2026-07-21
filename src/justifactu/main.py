@@ -25,7 +25,7 @@ from justifactu.logger import (
 from justifactu.filesystem import copy_file
 from justifactu.mail import send_qa_report_mail
 from justifactu.process import merge_bills_and_payments
-from justifactu.pdf import rename_payments
+from justifactu.payments import rename_payments
 from justifactu.custom_except import MainCriticalError
 from justifactu.secret import read_secret
 from justifactu.sharepoint import (

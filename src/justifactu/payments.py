@@ -13,13 +13,23 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
+import re
 from pathlib import Path
 
 from .SAP_ID import SAP_ID, parse_sap_id_from_string
 from .logger import get_logger
-from .custom_except import ParseSAPIdException
+
+from .token_manager import TokenManager
+from .bills import parse_sap_id_from_bill
+from .custom_except import (
+    ParseSAPIdException,
+    SkippedPdfRenamingInvalidSapId,
+    UnexpectedRenamingError,
+)
+from .SAP_ID import pattern as SAP_pattern
 from .defines import FileSuffix
+from .sharepoint import rename_file_remote
+from requests.exceptions import HTTPError
 
 log = get_logger(__name__)
 
@@ -48,3 +58,51 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
             log.error(f"Failed to parse SAP ID from {payment_path}: {filename}")
 
     return payment_map
+
+
+def rename_payments(
+    pdf_path: Path,
+    token_manager: TokenManager | None = None,
+    drive_id: str | None = None,
+    remote_folder: Path | None = None,
+) -> None:
+    """Renames the files from the payments folder"""
+    if not pdf_path.is_dir():
+        log.warning(f"{pdf_path} is not a directory")
+
+    rename_pattern = re.compile(
+        SAP_pattern + r"-P(" + re.escape(FileSuffix.PROCESSED_PAYMENT.value) + r")?$"
+    )
+    for entry in list(pdf_path.rglob("*")):
+        if entry.is_dir():
+            continue
+
+        if rename_pattern.search(entry.stem):
+            continue
+
+        if entry.suffix.lower() != ".pdf":
+            log.warning(f"Skipping file {entry}: non-PDF file")
+            continue
+
+        try:
+            log.info(f"Renaming: {entry.name}...")
+
+            sap_id = parse_sap_id_from_bill(entry)
+
+            relative_dir = entry.parent.relative_to(pdf_path)
+            file_remote_folder = (
+                remote_folder / relative_dir if remote_folder is not None else None
+            )
+
+            rename_file_remote(
+                entry, f"{sap_id}-P", token_manager, drive_id, file_remote_folder
+            )
+
+        except (ParseSAPIdException, HTTPError) as e:
+            log.error(f"Failed to rename {entry}: {e}")
+
+        except SkippedPdfRenamingInvalidSapId:
+            log.warning(f"Skipped {entry.name} due to invalid SAP id value")
+
+        except UnexpectedRenamingError as e:
+            log.exception(f"Unexpected error processing {entry.name}: {e}")

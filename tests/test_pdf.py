@@ -21,6 +21,7 @@ from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
 from justifactu.defines import FileSuffix, FolderName
 from justifactu.payments import (
     index_payments,
+    rename_payments,
 )
 from justifactu.process import (
     cleanup_processed_files,
@@ -29,7 +30,6 @@ from justifactu.process import (
 from justifactu.filesystem import index_folder
 from justifactu.pdf import (
     merge_pdfs,
-    rename_payments,
 )
 
 id_sap_instance = SAP_ID("2034567890")
@@ -188,14 +188,16 @@ def test_cleanup_processed_files_deletes_bill_when_requested(
 # ── rename_payments ───────────────────────────────────────────────────────────
 
 
-@patch("justifactu.pdf.rename_file_remote")
+@patch("justifactu.payments.rename_file_remote")
 def test_rename_payments_renames_pdf(mock_rename, tmp_path):
     payments_dir = tmp_path / "Remeses"
     payments_dir.mkdir()
     pdf = payments_dir / "some_payment_document.pdf"
     create_blank_pdf(pdf)
 
-    with patch("justifactu.pdf.parse_sap_id_from_bill", return_value=id_sap_instance):
+    with patch(
+        "justifactu.payments.parse_sap_id_from_bill", return_value=id_sap_instance
+    ):
         rename_payments(
             payments_dir,
             token_manager=MagicMock(),
@@ -218,7 +220,7 @@ def test_rename_payments_skips_already_renamed(tmp_path):
     already_renamed = payments_dir / f"{id_sap_instance}-P.pdf"
     create_blank_pdf(already_renamed)
 
-    with patch("justifactu.pdf.parse_sap_id_from_bill") as mock_parse:
+    with patch("justifactu.bills.parse_sap_id_from_bill") as mock_parse:
         rename_payments(payments_dir)
         mock_parse.assert_not_called()
 
@@ -229,7 +231,7 @@ def test_rename_payments_skips_non_pdf(tmp_path):
     txt_file = payments_dir / "document.txt"
     txt_file.touch()
 
-    with patch("justifactu.pdf.parse_sap_id_from_bill") as mock_parse:
+    with patch("justifactu.bills.parse_sap_id_from_bill") as mock_parse:
         rename_payments(payments_dir)
         mock_parse.assert_not_called()
 

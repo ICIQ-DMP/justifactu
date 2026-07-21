@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import logging
 from pathlib import Path
 
 from justifactu.arguments import process_parse_arguments
@@ -73,8 +74,11 @@ def main() -> None:
 
     sharepoint_url_map: dict[Path, str] | None = None
     if args.location == InputLocation.SHAREPOINT:
-        assert token_manager is not None
-        assert drive_id is not None
+        if token_manager is None or drive_id is None:
+            logging.error("Sharepoint requires an authenticated connection")
+            raise MainCriticalError(
+                "SharePoint mode requires an authenticated connection"
+            )
         sharepoint_url_map = build_file_url_map(
             token_manager,
             drive_id,

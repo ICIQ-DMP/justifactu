@@ -142,8 +142,10 @@ class _VaultClient:
 
         if self._token is None:
             self._authenticate()
-
-        assert self._token is not None
+        if self._token is None:
+            raise RuntimeError(
+                "Vault authentication completed without producing a token"
+            )
         vault_addr = _read_credential("VAULT_ADDR")
         url = f"{vault_addr}/v1/{_VAULT_BASE_PATH}/{subpath}"
         resp = self._session.get(

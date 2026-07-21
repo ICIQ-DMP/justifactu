@@ -34,9 +34,6 @@ from requests.exceptions import HTTPError
 log = get_logger(__name__)
 
 
-# TODO move to filesystem.py
-
-
 def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
     payment_map: dict[SAP_ID, Path] = {}
 

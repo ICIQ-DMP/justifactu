@@ -439,6 +439,9 @@ def delete_file_remote(
 ) -> None:
     if token_manager is None:
         return
-    assert drive_id is not None
-    assert remote_folder is not None
+    if drive_id is None or remote_folder is None:
+        log.error("drive_id and remote_folder are required when token_manager is set")
+        raise ValueError(
+            "drive_id and remote_folder are required when token_manager is set"
+        )
     delete_remote_item(token_manager, drive_id, remote_folder / file.name)

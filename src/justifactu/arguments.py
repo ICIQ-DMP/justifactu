@@ -67,6 +67,15 @@ def parse_arguments() -> argparse.Namespace:
         help="Path location of input data.",
     )
 
+    parser.add_argument(
+        "--download-input",
+        action="store_true",
+        default=False,
+        help="Force a fresh download of the input folder from SharePoint before processing, "
+        "as a fallback if OneDrive-for-Linux sync has failed or fallen behind. "
+        "Only meaningful with --location sharepoint.",
+    )
+
     args = parser.parse_args()
     return args
 

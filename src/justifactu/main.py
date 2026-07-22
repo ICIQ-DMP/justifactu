@@ -52,23 +52,25 @@ def main() -> None:
     site_id = None
     drive_id = None
 
-    if args.location == InputLocation.LOCAL:
-        input_folder = args.input_location
-    else:
+    input_folder = args.input_location
+
+    if args.location == InputLocation.SHAREPOINT:
         token_manager, site_id, drive_id = _connect_sharepoint()
-        download_input_folder(
-            token_manager,
-            drive_id,
-            FolderPaths.SHAREPOINT_INPUT_PATH.value,
-            args.input_location,
-        )
+
+        if args.download_input:
+            download_input_folder(
+                token_manager,
+                drive_id,
+                FolderPaths.SHAREPOINT_INPUT_PATH.value,
+                args.input_location,
+            )
 
         input_folder = args.input_location
 
     bills_folder = input_folder / FolderName.BILLS_INPUT.value
     payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
     bills_plus_payments_folder = (
-        input_folder.parent / "_output" / FolderName.MERGED_OUTPUT.value
+        input_folder.parent / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
     )
 
     sharepoint_url_map: dict[Path, str] | None = None
@@ -111,9 +113,11 @@ def main() -> None:
         )
 
         if args.location == InputLocation.SHAREPOINT:
-            assert token_manager is not None
-            assert drive_id is not None
-
+            if token_manager is None or drive_id is None:
+                logging.error("Sharepoint requires an authenticated connection")
+                raise MainCriticalError(
+                    "SharePoint mode requires an authenticated connection"
+                )
             qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
             copy_file(qa_report_path, qa_folder)
             regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
@@ -122,7 +126,7 @@ def main() -> None:
             upload_folder_recursive(
                 token_manager,
                 drive_id,
-                input_folder.parent / "_output",
+                input_folder.parent / FolderName.OUTPUT.value,
                 str(FolderPaths.SHAREPOINT_OUTPUT_PATH.value),
             )
 

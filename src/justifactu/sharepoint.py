@@ -25,6 +25,7 @@ from typing import cast
 import requests
 from requests.exceptions import HTTPError
 
+from .custom_except import MainCriticalError
 from .token_manager import TokenManager, get_token_manager
 from .logger import get_logger
 from .secret import read_secret
@@ -445,3 +446,12 @@ def delete_file_remote(
             "drive_id and remote_folder are required when token_manager is set"
         )
     delete_remote_item(token_manager, drive_id, remote_folder / file.name)
+
+
+def require_sharepoint_connection(
+    token_manager: TokenManager | None, drive_id: str | None
+) -> tuple[TokenManager, str]:
+    if token_manager is None or drive_id is None:
+        log.error("Sharepoint requires an authenticated connection")
+        raise MainCriticalError("SharePoint mode requires an authenticated connection")
+    return token_manager, drive_id

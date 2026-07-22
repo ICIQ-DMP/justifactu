@@ -13,7 +13,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import logging
 from pathlib import Path
 
 from justifactu.arguments import process_parse_arguments
@@ -34,9 +33,10 @@ from justifactu.sharepoint import (
     build_file_url_map,
     download_input_folder,
     upload_folder_recursive,
+    require_sharepoint_connection,
 )
 
-logger = get_logger(__name__)
+log = get_logger(__name__)
 
 
 def main() -> None:
@@ -65,8 +65,6 @@ def main() -> None:
                 args.input_location,
             )
 
-        input_folder = args.input_location
-
     bills_folder = input_folder / FolderName.BILLS_INPUT.value
     payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
     bills_plus_payments_folder = (
@@ -75,11 +73,7 @@ def main() -> None:
 
     sharepoint_url_map: dict[Path, str] | None = None
     if args.location == InputLocation.SHAREPOINT:
-        if token_manager is None or drive_id is None:
-            logging.error("Sharepoint requires an authenticated connection")
-            raise MainCriticalError(
-                "SharePoint mode requires an authenticated connection"
-            )
+        token_manager, drive_id = require_sharepoint_connection(token_manager, drive_id)
         sharepoint_url_map = build_file_url_map(
             token_manager,
             drive_id,
@@ -87,7 +81,7 @@ def main() -> None:
             bills_folder,
         )
 
-    logger.info("Starting...")
+    log.info("Starting...")
 
     try:
         remote_payments_folder = (
@@ -113,11 +107,9 @@ def main() -> None:
         )
 
         if args.location == InputLocation.SHAREPOINT:
-            if token_manager is None or drive_id is None:
-                logging.error("Sharepoint requires an authenticated connection")
-                raise MainCriticalError(
-                    "SharePoint mode requires an authenticated connection"
-                )
+            token_manager, drive_id = require_sharepoint_connection(
+                token_manager, drive_id
+            )
             qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
             copy_file(qa_report_path, qa_folder)
             regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
@@ -130,10 +122,10 @@ def main() -> None:
                 str(FolderPaths.SHAREPOINT_OUTPUT_PATH.value),
             )
 
-        logger.info("Finished...")
+        log.info("Finished...")
 
     except MainCriticalError as e:
-        logger.critical(e)
+        log.critical(e)
 
     finally:
         try:
@@ -143,7 +135,7 @@ def main() -> None:
                 qa_report_path=qa_report_path,
             )
         except Exception as e:
-            logger.error(f"Failed to send QA report email: {e}")
+            log.error(f"Failed to send QA report email: {e}")
 
 
 if __name__ == "__main__":

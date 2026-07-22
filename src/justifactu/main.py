@@ -17,7 +17,7 @@ import logging
 from pathlib import Path
 
 from justifactu.arguments import process_parse_arguments
-from justifactu.defines import NOW, InputLocation, FolderName, ROOT_FOLDER, SecretNames
+from justifactu.defines import NOW, InputLocation, FolderName, SecretNames, FolderPaths
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
@@ -32,7 +32,7 @@ from justifactu.secret import read_secret
 from justifactu.sharepoint import (
     _connect_sharepoint,
     build_file_url_map,
-    # download_input_folder,
+    download_input_folder,
     upload_folder_recursive,
 )
 
@@ -47,25 +47,24 @@ def main() -> None:
     )
 
     args = process_parse_arguments()
-    args.location = InputLocation.SHAREPOINT
-
-    default_input_folder = ROOT_FOLDER / "service/onedrive/data/justifactu/_input"
 
     token_manager = None
     site_id = None
     drive_id = None
 
     if args.location == InputLocation.LOCAL:
-        input_folder = args.input_location or default_input_folder
+        input_folder = args.input_location
     else:
-        input_folder = default_input_folder
         token_manager, site_id, drive_id = _connect_sharepoint()
-        # download_input_folder(
-        #    token_manager,
-        #    drive_id,
-        #    Path(FolderName.SHAREPOINT_INPUT_PATH),
-        #    input_folder,
-        # )
+        download_input_folder(
+            token_manager,
+            drive_id,
+            FolderPaths.SHAREPOINT_INPUT_PATH.value,
+            args.input_location,
+        )
+
+        input_folder = args.input_location
+
     bills_folder = input_folder / FolderName.BILLS_INPUT.value
     payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
     bills_plus_payments_folder = (
@@ -82,7 +81,7 @@ def main() -> None:
         sharepoint_url_map = build_file_url_map(
             token_manager,
             drive_id,
-            Path(FolderName.SHAREPOINT_INPUT_PATH) / FolderName.BILLS_INPUT,
+            FolderPaths.SHAREPOINT_INPUT_PATH.value / FolderName.BILLS_INPUT,
             bills_folder,
         )
 
@@ -90,10 +89,10 @@ def main() -> None:
 
     try:
         remote_payments_folder = (
-            Path(FolderName.SHAREPOINT_INPUT_PATH) / FolderName.PAYMENTS_INPUT.value
+            FolderPaths.SHAREPOINT_INPUT_PATH.value / FolderName.PAYMENTS_INPUT.value
         )
         remote_bills_folder = (
-            Path(FolderName.SHAREPOINT_INPUT_PATH) / FolderName.BILLS_INPUT.value
+            FolderPaths.SHAREPOINT_INPUT_PATH.value / FolderName.BILLS_INPUT.value
         )
 
         rename_payments(
@@ -124,7 +123,7 @@ def main() -> None:
                 token_manager,
                 drive_id,
                 input_folder.parent / "_output",
-                FolderName.SHAREPOINT_OUTPUT_PATH,
+                str(FolderPaths.SHAREPOINT_OUTPUT_PATH.value),
             )
 
         logger.info("Finished...")

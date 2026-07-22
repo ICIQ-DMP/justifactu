@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
-from enum import StrEnum
+from enum import StrEnum, Enum
 from pathlib import Path
 
 ROOT_FOLDER: Path = Path(__file__).resolve().parent.parent.parent
@@ -34,15 +34,31 @@ class InputLocation(StrEnum):
 
 
 class FolderName(StrEnum):
-    """Named folder paths used across the pipeline."""
+    """Named folders used across the pipeline."""
 
     BILLS_INPUT = "FACTURES_prova"
     PAYMENTS_INPUT = "Remeses_prova"
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
-    SHAREPOINT_INPUT_PATH = "justifactu/_input"
-    SHAREPOINT_OUTPUT_PATH = "justifactu/_output"
+    SHAREPOINT_ROOT = "justifactu"
+    INPUT = "_input"
+    OUTPUT = "_output"
+
+
+_SHAREPOINT_INPUT_PATH = Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.INPUT.value
+_SHAREPOINT_OUTPUT_PATH = (
+    Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.OUTPUT.value
+)
+
+
+class FolderPaths(Enum):
+    """Composed folder paths, built from FolderName segments."""
+
+    SHAREPOINT_INPUT_PATH = _SHAREPOINT_INPUT_PATH
+    SHAREPOINT_OUTPUT_PATH = _SHAREPOINT_OUTPUT_PATH
+    SHAREPOINT_BILLS_PATH = _SHAREPOINT_INPUT_PATH / FolderName.BILLS_INPUT.value
+    SHAREPOINT_PAYMENTS_PATH = _SHAREPOINT_INPUT_PATH / FolderName.PAYMENTS_INPUT.value
 
 
 class FileSuffix(StrEnum):

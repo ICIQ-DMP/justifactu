@@ -128,12 +128,12 @@ def send_mail_authenticated(
     """Send a plain-text email via SMTP with STARTTLS with authentication handled."""
     smtp_user = read_secret(SecretNames.SMTP_USERNAME.value)
     smtp_password = read_secret(SecretNames.SMTP_PASSWORD.value)
-    smtp_server = read_secret(SecretNames.SMTP_SERVER.value)
+    smtp_host = read_secret(SecretNames.SMTP_SERVER.value)
     smtp_port = int(read_secret(SecretNames.SMTP_PORT.value))
 
     log.trace(f'user is: "{smtp_user}"')
     log.trace(f'pass is: "{smtp_password}"')
-    log.trace(f'server is: "{smtp_server}"')
+    log.trace(f'host is: "{smtp_host}"')
     log.trace(f'port is: "{smtp_port}"')
 
     log.trace(f'recipient is: "{to_email}"')
@@ -145,7 +145,7 @@ def send_mail_authenticated(
         from_email=smtp_user,
         username=smtp_user,
         password=smtp_password,
-        server=smtp_server,
+        server=smtp_host,
         port=smtp_port,
     )
 

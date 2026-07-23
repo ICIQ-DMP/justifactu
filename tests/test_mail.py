@@ -17,7 +17,7 @@
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
-# from justifactu.defines import SecretNames
+from justifactu.defines import SecretNames
 from justifactu.mail import (
     send_mail,
     build_result_mail_body,
@@ -26,8 +26,7 @@ from justifactu.mail import (
     mail_process,
 )
 
-# from justifactu.secret import read_secret
-
+from justifactu.secret import read_secret
 
 # ── send_mail ─────────────────────────────────────────────────────────────────
 
@@ -181,9 +180,13 @@ def test_mail_process(mock_log, mock_build_body, mock_send_auth):
     mock_log.info.assert_called_once_with("Email sent. Process complete.")
 
 
-# def test_send_mail_authenticated_real():
+def test_send_mail_authenticated_real():
+    print(read_secret(SecretNames.SMTP_SERVER.value))
+    print(read_secret(SecretNames.SMTP_PORT.value))
+
+
 #    send_mail_authenticated(
-#       read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
-#      "Prova mailing",
-#     "Cos de la prova de mailing"
-#  )
+#      read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
+#     "Prova mailing",
+#    "Cos de la prova de mailing"
+# )

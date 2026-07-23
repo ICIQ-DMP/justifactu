@@ -29,7 +29,6 @@ from .custom_except import VaultSecretEmpty
 
 _VAULT_BASE_PATH = "secret/data/justifactu/runtime"
 
-# TODO create defines from values in secret_map in enum SecretNames
 # Maps app-level secret names to (vault subpath, vault field key)
 _SECRET_MAP = {
     # sharepoint

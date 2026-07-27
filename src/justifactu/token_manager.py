@@ -60,6 +60,8 @@ class TokenManager:
         if (
             self.access_token is None or time.time() >= self.expires_at - 300
         ):  # Refresh if <5min left
+            self._refresh_token()
+        if self.access_token is None:
             raise RuntimeError(
                 "Token refresh completed without producing an access token"
             )

@@ -32,11 +32,12 @@ from justifactu.secret import read_secret
 
 
 @patch("justifactu.mail.smtplib.SMTP")
+@patch("justifactu.mail.MIMEMultipart")
 @patch("justifactu.mail.MIMEText")
-def test_send_mail(mock_mime_text, mock_smtp):
+def test_send_mail(mock_mime_text, mock_multipart, mock_smtp):
     mock_msg_instance = MagicMock()
     mock_msg_instance.as_string.return_value = "Mocked Email String"
-    mock_mime_text.return_value = mock_msg_instance
+    mock_multipart.return_value = mock_msg_instance
 
     mock_smtp_instance = MagicMock()
     mock_smtp.return_value.__enter__.return_value = mock_smtp_instance
@@ -56,6 +57,7 @@ def test_send_mail(mock_mime_text, mock_smtp):
     mock_msg_instance.__setitem__.assert_any_call("Subject", "Test Subject")
     mock_msg_instance.__setitem__.assert_any_call("From", "admin@example.com")
     mock_msg_instance.__setitem__.assert_any_call("To", "user@example.com")
+    mock_msg_instance.attach.assert_called_once_with(mock_mime_text.return_value)
 
     mock_smtp.assert_called_once_with("smtp.office365.com", 587)
     mock_smtp_instance.ehlo.assert_called_once()
@@ -132,6 +134,7 @@ def test_send_mail_authenticated(mock_log, mock_read_secret, mock_send_mail):
         password="my_pass",
         server="smtp.test.com",
         port=587,
+        attachment_paths=None,
     )
 
 
@@ -184,9 +187,8 @@ def test_send_mail_authenticated_real():
     print(read_secret(SecretNames.SMTP_SERVER.value))
     print(read_secret(SecretNames.SMTP_PORT.value))
 
-
-#    send_mail_authenticated(
-#      read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
-#     "Prova mailing",
-#    "Cos de la prova de mailing"
-# )
+    send_mail_authenticated(
+        read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
+        "Prova mailing",
+        "Cos de la prova de mailing",
+    )

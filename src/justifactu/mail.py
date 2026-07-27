@@ -18,6 +18,8 @@
 
 import smtplib
 from datetime import datetime
+from email.mime.application import MIMEApplication
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
 
@@ -38,29 +40,27 @@ def send_mail(
     password: str,
     server: str,
     port: int,
+    attachment_paths: list[Path] | None = None,
 ) -> dict[str, tuple[int, bytes]]:
-    """Send a plain-text email via SMTP with STARTTLS.
-
-    Args:
-        to_email: Recipient email address.
-        subject: Email subject line.
-        body: Plain-text email body.
-        from_email: Sender address shown in the ``From`` header.
-        username: SMTP authentication username.
-        password: SMTP authentication password.
-        server: SMTP server hostname.
-        port: SMTP server port (typically 587 for STARTTLS).
-    """
-    # Create message
-    msg = MIMEText(body)
+    """Send a plain-text email via SMTP with STARTTLS, optionally with file attachments."""
+    msg = MIMEMultipart()
     msg["Subject"] = subject
     msg["From"] = from_email
     msg["To"] = to_email
+    msg.attach(MIMEText(body))
 
-    # Connect to Microsoft 365 SMTP
+    for attachment_path in attachment_paths or []:
+        attachment = MIMEApplication(
+            attachment_path.read_bytes(), Name=attachment_path.name
+        )
+        attachment["Content-Disposition"] = (
+            f'attachment; filename="{attachment_path.name}"'
+        )
+        msg.attach(attachment)
+
     with smtplib.SMTP(server, port) as socket:
         socket.ehlo()
-        socket.starttls()  # Upgrade connection to TLS
+        socket.starttls()
         socket.login(username, password)
         return socket.sendmail(from_email, [to_email], msg.as_string())
 
@@ -124,6 +124,7 @@ def send_mail_authenticated(
     to_email: str,
     subject: str,
     body: str,
+    attachment_paths: list[Path] | None = None,
 ) -> dict[str, tuple[int, bytes]]:
     """Send a plain-text email via SMTP with STARTTLS with authentication handled."""
     smtp_user = read_secret(SecretNames.SMTP_USERNAME.value)
@@ -147,6 +148,7 @@ def send_mail_authenticated(
         password=smtp_password,
         server=smtp_host,
         port=smtp_port,
+        attachment_paths=attachment_paths,
     )
 
 
@@ -191,17 +193,25 @@ def mail_process(
     log.info("Email sent. Process complete.")
 
 
-def send_qa_report_mail(to_email: str, message: str, qa_report_path: Path) -> None:
-    """Send the QA report generated during a run, together with a custom message.
+def send_qa_report_mail(
+    to_email: str,
+    message: str,
+    qa_report_path: Path,
+    additional_attachments: list[Path] | None = None,
+) -> None:
+    """Send the run's QA report and log file(s) as attachments, with a custom message.
 
     Args:
         to_email: Recipient email address.
-        message: Free-text message to include above the report content.
+        message: Free-text message making up the email body.
         qa_report_path: Path to the QA report log file generated during the run.
+        additional_attachments: Any further files to attach (e.g. the full run log).
     """
     subject = f"Justifactu - QA report {qa_report_path.stem}"
-    qa_report_text = qa_report_path.read_text()
-    body = f"{message}\n\n--- QA Report ---\n{qa_report_text}"
-
-    send_mail_authenticated(to_email, subject, body)
+    send_mail_authenticated(
+        to_email,
+        subject,
+        message,
+        attachment_paths=[qa_report_path, *(additional_attachments or [])],
+    )
     log.info("QA report email sent.")

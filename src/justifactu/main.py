@@ -21,6 +21,7 @@ from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
     get_logger,
+    get_user_log_path,
 )
 from justifactu.filesystem import copy_file
 from justifactu.mail import send_qa_report_mail
@@ -128,13 +129,18 @@ def main() -> None:
         log.critical(e)
 
     finally:
+
         try:
+
             send_qa_report_mail(
                 to_email=read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
                 message="Adjuntem el informe QA de l'execució.",
                 qa_report_path=qa_report_path,
+                additional_attachments=[get_user_log_path()],
             )
+
         except Exception as e:
+
             log.error(f"Failed to send QA report email: {e}")
 
 

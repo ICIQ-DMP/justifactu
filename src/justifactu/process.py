@@ -17,6 +17,7 @@
 from pathlib import Path
 from requests.exceptions import HTTPError
 
+from .SAP_ID import SAP_ID
 from .bills import parse_bill_filename
 from .custom_except import (
     MergingBillWithPaymentError,
@@ -44,11 +45,15 @@ def merge_bills_and_payments(
     drive_id: str | None = None,
     remote_bills_folder: Path | None = None,
     remote_payments_folder: Path | None = None,
+    freshly_renamed_payments: dict[SAP_ID, Path] | None = None,
 ) -> None:
     """Merges bills and payments and saves them into merge_folder"""
 
     merge_folder.mkdir(parents=True, exist_ok=True)
-    payment_map = index_payments(index_folder(payments_folder))
+    payment_map = {
+        **index_payments(index_folder(payments_folder)),
+        **(freshly_renamed_payments or {}),
+    }
     successful_payments: set[Path] = set()
     qa_folder = merge_folder / FolderName.QA_ERRORS
     qa_folder.mkdir(parents=True, exist_ok=True)

@@ -196,7 +196,7 @@ def test_rename_payments_renames_pdf(mock_rename, tmp_path):
     create_blank_pdf(pdf)
 
     with patch(
-        "justifactu.payments.parse_sap_id_from_bill", return_value=id_sap_instance
+        "justifactu.payments.parse_sap_id_from_bill", return_value=str(id_sap_instance)
     ):
         rename_payments(
             payments_dir,

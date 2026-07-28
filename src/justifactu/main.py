@@ -91,7 +91,7 @@ def main() -> None:
             FolderPaths.SHAREPOINT_INPUT_PATH.value / FolderName.BILLS_INPUT.value
         )
 
-        rename_payments(
+        freshly_renamed_payments = rename_payments(
             payments_folder, token_manager, drive_id, remote_payments_folder
         )
         merge_bills_and_payments(
@@ -104,6 +104,7 @@ def main() -> None:
             drive_id=drive_id,
             remote_bills_folder=remote_bills_folder,
             remote_payments_folder=remote_payments_folder,
+            freshly_renamed_payments=freshly_renamed_payments,
         )
 
         if args.location == InputLocation.SHAREPOINT:

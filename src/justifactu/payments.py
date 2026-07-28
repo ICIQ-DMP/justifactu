@@ -62,10 +62,14 @@ def rename_payments(
     token_manager: TokenManager | None = None,
     drive_id: str | None = None,
     remote_folder: Path | None = None,
-) -> None:
-    """Renames the files from the payments folder"""
+) -> dict[SAP_ID, Path]:
+    """Renames the files from the payments folder, returning a SAP ID -> local path
+    map for the files renamed in this run (so matching doesn't have to wait for
+    the local mirror to catch up)."""
     if not pdf_path.is_dir():
         log.warning(f"{pdf_path} is not a directory")
+
+    renamed_this_run: dict[SAP_ID, Path] = {}
 
     rename_pattern = re.compile(
         SAP_pattern + r"-P(" + re.escape(FileSuffix.PROCESSED_PAYMENT.value) + r")?$"
@@ -85,6 +89,7 @@ def rename_payments(
             log.info(f"Renaming: {entry.name}...")
 
             sap_id = parse_sap_id_from_bill(entry)
+            renamed_this_run[SAP_ID(sap_id)] = entry
 
             relative_dir = entry.parent.relative_to(pdf_path)
             file_remote_folder = (
@@ -97,9 +102,9 @@ def rename_payments(
 
         except (ParseSAPIdException, HTTPError) as e:
             log.error(f"Failed to rename {entry}: {e}")
-
         except SkippedPdfRenamingInvalidSapId:
             log.warning(f"Skipped {entry.name} due to invalid SAP id value")
-
         except UnexpectedRenamingError as e:
             log.exception(f"Unexpected error processing {entry.name}: {e}")
+
+    return renamed_this_run

@@ -355,7 +355,6 @@ def build_file_url_map(
     Returns:
         Dict mapping each local file path to its SharePoint ``webUrl``.
     """
-    items = list_folder_contents(token_manager, drive_id, remote_folder)
     result: dict[Path, str] = {}
     items = list_folder_contents(token_manager, drive_id, remote_folder)
     for item in items:
@@ -385,6 +384,11 @@ def rename_remote_item(
         "Content-Type": "application/json",
     }
     response = requests.patch(url, headers=headers, json={"name": new_name})
+    if response.status_code == 409:
+        log.info(
+            f"{remote_path} already renamed to {new_name}; treating as already done"
+        )
+        return
     response.raise_for_status()
 
 

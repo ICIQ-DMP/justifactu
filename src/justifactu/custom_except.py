@@ -33,10 +33,6 @@ class MergingBillWithPaymentError(Exception):
     """Raised when merging bills with payment cannot be made."""
 
 
-class FileDeletionError(Exception):
-    """Raised when a file cannot be deleted."""
-
-
 class MainCriticalError(Exception):
     """Raised when critical error occurs on main procedure."""
 
@@ -51,11 +47,3 @@ class UnexpectedRenamingError(Exception):
 
 class VaultSecretEmpty(Exception):
     """Raised when secret is empty."""
-
-
-class BadSharepointListUpdateRequestError(Exception):
-    """Raised when a sharepoint list update request cannot be made."""
-
-
-class DirectoryNotFoundError(Exception):
-    """Raised when a directory cannot be found."""

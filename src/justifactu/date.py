@@ -28,28 +28,6 @@ log = logger.get_logger(__name__)
 # ---------------------------------------------------------------------------
 
 
-def unparse_month(d: datetime) -> str:
-    """Return the zero-padded two-digit month string."""
-    return d.strftime("%m")
-
-
-def unparse_year_month(d: datetime) -> str:
-    """Return a six-character YYYYMM string."""
-    return d.strftime("%Y%m")
-
-
-def unparse_year_month_short(d: datetime) -> str:
-    """Return a four-character YYMM string."""
-    return d.strftime("%y%m")
-
-
 def unparse_date(d: datetime, separator: str = "-") -> str:
     """Return a MM<sep>YYYY string."""
     return d.strftime("%m") + separator + d.strftime("%Y")
-
-
-def unparse_full_date(d: datetime, separator: str = "-") -> str:
-    """Return a DD<sep>MM<sep>YYYY string."""
-    return (
-        d.strftime("%d") + separator + d.strftime("%m") + separator + d.strftime("%Y")
-    )

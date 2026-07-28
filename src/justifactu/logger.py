@@ -82,10 +82,6 @@ def get_default_log_path() -> Path:
     return ADMIN_LOG_FOLDER / (NOW + ".log")
 
 
-def get_supervisor_log_path() -> Path:
-    return get_default_log_path()
-
-
 def get_user_log_path() -> Path:
     return get_default_log_path()
 

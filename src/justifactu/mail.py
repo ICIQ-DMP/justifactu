@@ -132,13 +132,6 @@ def send_mail_authenticated(
     smtp_host = read_secret(SecretNames.SMTP_SERVER.value)
     smtp_port = int(read_secret(SecretNames.SMTP_PORT.value))
 
-    log.trace(f'user is: "{smtp_user}"')
-    log.trace(f'pass is: "{smtp_password}"')
-    log.trace(f'host is: "{smtp_host}"')
-    log.trace(f'port is: "{smtp_port}"')
-
-    log.trace(f'recipient is: "{to_email}"')
-
     return send_mail(
         to_email=to_email,
         subject=subject,

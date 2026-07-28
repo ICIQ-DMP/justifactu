@@ -144,6 +144,7 @@ def test_cleanup_processed_files_renames_payment(mock_rename, tmp_path):
     cleanup_processed_files(
         bill,
         payment,
+        payment_remote_name=payment.name,
         delete_processed=False,
         token_manager=MagicMock(),
         drive_id="drive-id",
@@ -156,6 +157,7 @@ def test_cleanup_processed_files_renames_payment(mock_rename, tmp_path):
         mock_rename.call_args.args[2],
         "drive-id",
         tmp_path,
+        current_remote_name=f"{id_sap_instance}-P.pdf",
     )
     assert bill.exists()
 
@@ -173,6 +175,7 @@ def test_cleanup_processed_files_deletes_bill_when_requested(
     cleanup_processed_files(
         bill,
         payment,
+        payment_remote_name=payment.name,
         delete_processed=True,
         token_manager=MagicMock(),
         drive_id="drive-id",
@@ -296,4 +299,4 @@ def test_merge_bills_and_payments_delete_processed(mock_cleanup, billing_dirs):
 
     merge_bills_and_payments(bills_dir, payments_dir, output_dir, delete_processed=True)
 
-    assert mock_cleanup.call_args.args[2] is True  # delete_processed passed through
+    assert mock_cleanup.call_args.args[3] is True  # delete_processed passed through

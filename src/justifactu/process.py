@@ -85,6 +85,7 @@ def merge_bills_and_payments(
             log.error(f"No matching payment found for bill {bill_path}{url_suffix}")
             continue
 
+        payment_remote_name = f"{sap}-P{matched_payment.suffix}"
         output_folder_name = sap.year + FolderName.YEAR_FOLDER_SUFFIX.value
         output_folder_path = merge_folder / output_folder_name
         output_folder_path.mkdir(parents=True, exist_ok=True)
@@ -113,6 +114,7 @@ def merge_bills_and_payments(
             cleanup_processed_files(
                 bill_path,
                 matched_payment,
+                payment_remote_name,
                 delete_processed,
                 token_manager,
                 drive_id,
@@ -126,6 +128,7 @@ def merge_bills_and_payments(
 def cleanup_processed_files(
     bill_path: Path,
     matched_payment: Path,
+    payment_remote_name: str,
     delete_processed: bool,
     token_manager: TokenManager | None = None,
     drive_id: str | None = None,
@@ -133,12 +136,17 @@ def cleanup_processed_files(
     bill_remote_folder: Path | None = None,
 ) -> None:
     """Renames the payment file and optionally deletes the bill file"""
-    new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT.value}"
+    new_name = f"{Path(payment_remote_name).stem}{FileSuffix.PROCESSED_PAYMENT.value}"
     try:
         rename_file_remote(
-            matched_payment, new_name, token_manager, drive_id, payment_remote_folder
+            matched_payment,
+            new_name,
+            token_manager,
+            drive_id,
+            payment_remote_folder,
+            current_remote_name=payment_remote_name,
         )
-        log.info(f"Renamed processed payment file: {matched_payment.name}")
+        log.info(f"Renamed processed payment file: {payment_remote_name}")
 
         if delete_processed:
             try:
@@ -150,4 +158,4 @@ def cleanup_processed_files(
                 log.exception(f"Failed to delete {bill_path.name}: {e}")
 
     except HTTPError as e:
-        log.error(f"Failed to rename processed payment file {matched_payment}: {e}")
+        log.error(f"Failed to rename processed payment file {payment_remote_name}: {e}")

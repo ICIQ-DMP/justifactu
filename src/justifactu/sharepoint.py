@@ -419,6 +419,7 @@ def rename_file_remote(
     token_manager: TokenManager | None,
     drive_id: str | None,
     remote_folder: Path | None,
+    current_remote_name: str | None = None,
 ) -> None:
     if token_manager is None:
         return
@@ -427,8 +428,9 @@ def rename_file_remote(
         raise ValueError(
             "drive_id and remote_folder are required when token_manager is set"
         )
+    source_name = current_remote_name if current_remote_name is not None else file.name
     rename_remote_item(
-        token_manager, drive_id, remote_folder / file.name, new_name + file.suffix
+        token_manager, drive_id, remote_folder / source_name, new_name + file.suffix
     )
 
 

@@ -187,8 +187,8 @@ def test_send_mail_authenticated_real():
     print(read_secret(SecretNames.SMTP_SERVER.value))
     print(read_secret(SecretNames.SMTP_PORT.value))
 
-    send_mail_authenticated(
-        read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
-        "Prova mailing",
-        "Cos de la prova de mailing",
-    )
+    # send_mail_authenticated(
+    #     read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
+    #     "Prova mailing",
+    #     "Cos de la prova de mailing",
+    # )

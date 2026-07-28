@@ -50,7 +50,6 @@ def main() -> None:
     args = process_parse_arguments()
 
     token_manager = None
-    site_id = None
     drive_id = None
 
     input_folder = args.input_location

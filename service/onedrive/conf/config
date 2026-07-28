@@ -11,6 +11,8 @@ sync_file_permissions = "644"
 download_only = "true"
 cleanup_local_files = "true"
 
+monitor_interval = "60"
+
 bypass_data_preservation = "true"
 
 #resync = "true"

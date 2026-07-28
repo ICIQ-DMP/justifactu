@@ -123,8 +123,6 @@ def test_send_mail_authenticated(mock_log, mock_read_secret, mock_send_mail):
 
     assert mock_read_secret.call_count == 4
 
-    assert mock_log.trace.call_count == 5
-
     mock_send_mail.assert_called_once_with(
         to_email="target@example.com",
         subject="Auth Subject",

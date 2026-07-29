@@ -154,6 +154,8 @@ def cleanup_processed_files(
                     bill_path, token_manager, drive_id, bill_remote_folder
                 )
                 log.info(f"Deleted: {bill_path.name}")
+                bill_path.unlink(missing_ok=True)
+
             except HTTPError as e:
                 log.exception(f"Failed to delete {bill_path.name}: {e}")
 

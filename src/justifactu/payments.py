@@ -17,19 +17,15 @@ import re
 from pathlib import Path
 
 from .SAP_ID import SAP_ID, parse_sap_id_from_string
+from .filesystem import change_file_name
 from .logger import get_logger
 
-from .token_manager import TokenManager
 from .bills import parse_sap_id_from_bill
 from .custom_except import (
     ParseSAPIdException,
-    SkippedPdfRenamingInvalidSapId,
-    UnexpectedRenamingError,
 )
 from .SAP_ID import pattern as SAP_pattern
 from .defines import FileSuffix
-from .sharepoint import rename_file_remote
-from requests.exceptions import HTTPError
 
 log = get_logger(__name__)
 
@@ -59,9 +55,6 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
 
 def rename_payments(
     pdf_path: Path,
-    token_manager: TokenManager | None = None,
-    drive_id: str | None = None,
-    remote_folder: Path | None = None,
 ) -> dict[SAP_ID, Path]:
     """Renames the files from the payments folder, returning a SAP ID -> local path
     map for the files renamed in this run (so matching doesn't have to wait for
@@ -89,22 +82,10 @@ def rename_payments(
             log.info(f"Renaming: {entry.name}...")
 
             sap_id = parse_sap_id_from_bill(entry)
-            renamed_this_run[SAP_ID(sap_id)] = entry
+            renamed_path = change_file_name(entry, f"{sap_id}-P")
+            renamed_this_run[SAP_ID(sap_id)] = renamed_path
 
-            relative_dir = entry.parent.relative_to(pdf_path)
-            file_remote_folder = (
-                remote_folder / relative_dir if remote_folder is not None else None
-            )
-
-            rename_file_remote(
-                entry, f"{sap_id}-P", token_manager, drive_id, file_remote_folder
-            )
-
-        except (ParseSAPIdException, HTTPError) as e:
+        except (ParseSAPIdException, FileNotFoundError) as e:
             log.error(f"Failed to rename {entry}: {e}")
-        except SkippedPdfRenamingInvalidSapId:
-            log.warning(f"Skipped {entry.name} due to invalid SAP id value")
-        except UnexpectedRenamingError as e:
-            log.exception(f"Unexpected error processing {entry.name}: {e}")
 
     return renamed_this_run

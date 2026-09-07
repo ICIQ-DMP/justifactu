@@ -13,10 +13,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-from pathlib import Path
 
 from justifactu.arguments import process_parse_arguments
-from justifactu.defines import NOW, InputLocation, FolderName, SecretNames, FolderPaths
+from justifactu.defines import NOW, FolderName, SecretNames
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
@@ -29,13 +28,6 @@ from justifactu.process import merge_bills_and_payments
 from justifactu.payments import rename_payments
 from justifactu.custom_except import MainCriticalError
 from justifactu.secret import read_secret
-from justifactu.sharepoint import (
-    _connect_sharepoint,
-    build_file_url_map,
-    download_input_folder,
-    upload_folder_recursive,
-    require_sharepoint_connection,
-)
 
 log = get_logger(__name__)
 
@@ -49,21 +41,7 @@ def main() -> None:
 
     args = process_parse_arguments()
 
-    token_manager = None
-    drive_id = None
-
     input_folder = args.input_location
-
-    if args.location == InputLocation.SHAREPOINT:
-        token_manager, site_id, drive_id = _connect_sharepoint()
-
-        if args.download_input:
-            download_input_folder(
-                token_manager,
-                drive_id,
-                FolderPaths.SHAREPOINT_INPUT_PATH.value,
-                args.input_location,
-            )
 
     bills_folder = input_folder / FolderName.BILLS_INPUT.value
     payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
@@ -71,57 +49,22 @@ def main() -> None:
         input_folder.parent / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
     )
 
-    sharepoint_url_map: dict[Path, str] | None = None
-    if args.location == InputLocation.SHAREPOINT:
-        token_manager, drive_id = require_sharepoint_connection(token_manager, drive_id)
-        sharepoint_url_map = build_file_url_map(
-            token_manager,
-            drive_id,
-            FolderPaths.SHAREPOINT_INPUT_PATH.value / FolderName.BILLS_INPUT,
-            bills_folder,
-        )
-
     log.info("Starting...")
 
     try:
-        remote_payments_folder = (
-            FolderPaths.SHAREPOINT_INPUT_PATH.value / FolderName.PAYMENTS_INPUT.value
-        )
-        remote_bills_folder = (
-            FolderPaths.SHAREPOINT_INPUT_PATH.value / FolderName.BILLS_INPUT.value
-        )
-
-        freshly_renamed_payments = rename_payments(
-            payments_folder, token_manager, drive_id, remote_payments_folder
-        )
+        freshly_renamed_payments = rename_payments(payments_folder)
         merge_bills_and_payments(
             bills_folder,
             payments_folder,
             bills_plus_payments_folder,
             delete_processed=True,
-            sharepoint_url_map=sharepoint_url_map,
-            token_manager=token_manager,
-            drive_id=drive_id,
-            remote_bills_folder=remote_bills_folder,
-            remote_payments_folder=remote_payments_folder,
             freshly_renamed_payments=freshly_renamed_payments,
         )
 
-        if args.location == InputLocation.SHAREPOINT:
-            token_manager, drive_id = require_sharepoint_connection(
-                token_manager, drive_id
-            )
-            qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
-            copy_file(qa_report_path, qa_folder)
-            regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
-            copy_file(regular_log_path, qa_folder)
-
-            upload_folder_recursive(
-                token_manager,
-                drive_id,
-                input_folder.parent / FolderName.OUTPUT.value,
-                str(FolderPaths.SHAREPOINT_OUTPUT_PATH.value),
-            )
+        qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
+        copy_file(qa_report_path, qa_folder)
+        regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
+        copy_file(regular_log_path, qa_folder)
 
         log.info("Finished...")
 

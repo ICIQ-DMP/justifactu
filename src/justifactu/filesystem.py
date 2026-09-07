@@ -67,7 +67,7 @@ def move_file(origin_path: Path, target_path: Path) -> None:
         log.exception(f"Unexpected error: {e}")
 
 
-def change_file_name(file: Path, new_name: str) -> Path | None:
+def change_file_name(file: Path, new_name: str) -> Path:
     """Changes the name of a file"""
 
     if not file.exists():

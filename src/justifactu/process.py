@@ -121,11 +121,18 @@ def mock_phase3() -> None:
     log.error("Mocking phase 3 successful! :D")
 
 
-def run_phase(phase: Phase, input_folder: Path) -> None:
+def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
     bills_folder = input_folder / FolderName.BILLS_INPUT.value
     payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
     bills_plus_payments_folder = (
         input_folder.parent / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
+    )
+    return bills_folder, payments_folder, bills_plus_payments_folder
+
+
+def _build_phase_map(input_folder: Path) -> dict[Phase, Callable[[], None]]:
+    bills_folder, payments_folder, bills_plus_payments_folder = _phase_folders(
+        input_folder
     )
 
     def _run_phase_1() -> None:
@@ -139,10 +146,21 @@ def run_phase(phase: Phase, input_folder: Path) -> None:
             delete_processed=True,
         )
 
-    phase_map: dict[Phase, Callable[[], None]] = {
+    return {
         Phase.PHASE_1: _run_phase_1,
         Phase.PHASE_2: _run_phase_2,
         Phase.PHASE_3: mock_phase3,
     }
 
-    phase_map[phase]()
+
+def run_phase(phase: Phase, input_folder: Path) -> None:
+    _build_phase_map(input_folder)[phase]()
+
+
+FULL_RUN_PHASES: tuple[Phase, ...] = (Phase.PHASE_1, Phase.PHASE_2)
+
+
+def run_all_phases(input_folder: Path) -> None:
+    phase_map = _build_phase_map(input_folder)
+    for phase in FULL_RUN_PHASES:
+        phase_map[phase]()

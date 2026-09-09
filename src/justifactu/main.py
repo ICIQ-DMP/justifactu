@@ -24,8 +24,7 @@ from justifactu.logger import (
 )
 from justifactu.filesystem import copy_file
 from justifactu.mail import send_qa_report_mail
-from justifactu.process import merge_bills_and_payments
-from justifactu.payments import rename_payments
+from justifactu.process import run_all_phases
 from justifactu.custom_except import MainCriticalError
 from justifactu.secret import read_secret
 
@@ -35,32 +34,21 @@ log = get_logger(__name__)
 def main() -> None:
     """"""
     qa_report_path = ADMIN_LOG_FOLDER / (NOW + "_qa_report.log")
-    configure_logging_from_settings(
-        qa_files_log_file=qa_report_path,
-    )
+    configure_logging_from_settings(qa_files_log_file=qa_report_path)
 
     args = process_parse_arguments()
-
     input_folder = args.input_location
-
-    bills_folder = input_folder / FolderName.BILLS_INPUT.value
-    payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
-    bills_plus_payments_folder = (
-        input_folder.parent / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
-    )
 
     log.info("Starting...")
 
     try:
-        freshly_renamed_payments = rename_payments(payments_folder)
-        merge_bills_and_payments(
-            bills_folder,
-            payments_folder,
-            bills_plus_payments_folder,
-            delete_processed=True,
-            freshly_renamed_payments=freshly_renamed_payments,
-        )
+        run_all_phases(input_folder)
 
+        bills_plus_payments_folder = (
+            input_folder.parent
+            / FolderName.OUTPUT.value
+            / FolderName.MERGED_OUTPUT.value
+        )
         qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
         copy_file(qa_report_path, qa_folder)
         regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
@@ -72,20 +60,12 @@ def main() -> None:
         log.critical(e)
 
     finally:
-
         try:
-
             send_qa_report_mail(
                 to_email=read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
                 message="Adjuntem el informe QA de l'execució.",
                 qa_report_path=qa_report_path,
                 additional_attachments=[get_user_log_path()],
             )
-
         except Exception as e:
-
             log.error(f"Failed to send QA report email: {e}")
-
-
-if __name__ == "__main__":
-    main()

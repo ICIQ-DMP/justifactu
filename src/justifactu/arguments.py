@@ -19,7 +19,7 @@ import sys
 from pathlib import Path
 
 from justifactu.custom_except import ArgumentInputLocationError
-from justifactu.defines import InputLocation, ROOT_FOLDER
+from justifactu.defines import InputLocation, ROOT_FOLDER, Phase
 
 
 def parse_input_type(value: str) -> InputLocation:
@@ -40,6 +40,15 @@ def parse_input_location(value: str) -> Path:
     if not path.is_dir():
         raise ArgumentInputLocationError(f"Path {value} is not a directory")
     return path
+
+
+def parse_phase(value: str) -> Phase:
+    try:
+        return Phase(value)
+    except ValueError:
+        raise ArgumentInputLocationError(
+            'The phase supplied "' + value + '" is not defined.'
+        )
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -74,6 +83,16 @@ def parse_arguments() -> argparse.Namespace:
         help="Force a fresh download of the input folder from SharePoint before processing, "
         "as a fallback if OneDrive-for-Linux sync has failed or fallen behind. "
         "Only meaningful with --location sharepoint.",
+    )
+
+    parser.add_argument(
+        "-p",
+        "--phase",
+        type=parse_phase,
+        required=False,
+        default=None,
+        help="Which phase to run. Possible values: "
+        + ", ".join(p.value for p in Phase),
     )
 
     args = parser.parse_args()

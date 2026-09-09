@@ -61,6 +61,12 @@ class FolderPaths(Enum):
     SHAREPOINT_PAYMENTS_PATH = _SHAREPOINT_INPUT_PATH / FolderName.PAYMENTS_INPUT.value
 
 
+class Phase(StrEnum):
+    PHASE_1 = "1"
+    PHASE_2 = "2"
+    PHASE_3 = "3"
+
+
 class FileSuffix(StrEnum):
     """Named file suffixes used across the pipeline."""
 

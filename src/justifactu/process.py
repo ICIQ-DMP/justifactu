@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
+from typing import Callable
 
 from .SAP_ID import SAP_ID
 from .bills import parse_bill_filename
@@ -23,10 +24,10 @@ from .custom_except import (
     ParseSAPIdException,
 )
 
-from .defines import FolderName, FileSuffix
+from .defines import FolderName, FileSuffix, Phase
 from .filesystem import list_dir, index_folder, change_file_name
 from .logger import get_logger
-from .payments import index_payments
+from .payments import index_payments, rename_payments
 from .pdf import merge_pdfs
 
 log = get_logger(__name__)
@@ -114,3 +115,34 @@ def cleanup_processed_files(
         log.error(
             f"Failed to rename processed payment file {matched_payment.name}: {e}"
         )
+
+
+def mock_phase3() -> None:
+    log.error("Mocking phase 3 successful! :D")
+
+
+def run_phase(phase: Phase, input_folder: Path) -> None:
+    bills_folder = input_folder / FolderName.BILLS_INPUT.value
+    payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
+    bills_plus_payments_folder = (
+        input_folder.parent / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
+    )
+
+    def _run_phase_1() -> None:
+        rename_payments(payments_folder)
+
+    def _run_phase_2() -> None:
+        merge_bills_and_payments(
+            bills_folder,
+            payments_folder,
+            bills_plus_payments_folder,
+            delete_processed=True,
+        )
+
+    phase_map: dict[Phase, Callable[[], None]] = {
+        Phase.PHASE_1: _run_phase_1,
+        Phase.PHASE_2: _run_phase_2,
+        Phase.PHASE_3: mock_phase3,
+    }
+
+    phase_map[phase]()

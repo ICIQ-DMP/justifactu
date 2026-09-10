@@ -13,7 +13,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import os
+from pathlib import Path
 
+from justifactu.onedrive_sync import run_onedrive_sync
 from justifactu.arguments import process_parse_arguments
 from justifactu.defines import NOW, FolderName, SecretNames
 from justifactu.logger import (
@@ -39,9 +42,13 @@ def main() -> None:
     args = process_parse_arguments()
     input_folder = args.input_location
 
+    confdir = Path(os.environ.get("OD_CONFDIR", "/onedrive/conf"))
+
     log.info("Starting...")
 
     try:
+        run_onedrive_sync(confdir, direction="download")
+
         run_all_phases(input_folder)
 
         bills_plus_payments_folder = (
@@ -53,6 +60,8 @@ def main() -> None:
         copy_file(qa_report_path, qa_folder)
         regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
         copy_file(regular_log_path, qa_folder)
+
+        run_onedrive_sync(confdir, direction="upload")
 
         log.info("Finished...")
 

@@ -33,6 +33,13 @@ class InputLocation(StrEnum):
     LOCAL = "local"
 
 
+class SyncDirection(StrEnum):
+    """Sync direction argument possible values."""
+
+    DOWNLOAD = "download"
+    UPLOAD = "upload"
+
+
 class FolderName(StrEnum):
     """Named folders used across the pipeline."""
 

@@ -106,6 +106,8 @@ docker-build:  ## Build the Docker image
 docker-push:  ## Push the Docker image
 	@sudo docker push $(DOCKER_IMAGE):latest
 
+docker-phase%:
+	@sudo docker compose run --rm app --input-location /app/service/onedrive/data --phase $*
 # ---- maintenance ----------------------------------------------------------
 
 clean:  ## Remove build/test artifacts

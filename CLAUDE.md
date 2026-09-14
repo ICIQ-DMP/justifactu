@@ -35,18 +35,18 @@ Git commit messages must follow Conventional Commits (enforced by `conventional-
 `if __name__ == "__main__"` guard is dead code, since nothing runs `main.py` directly. `__main__.py` parses CLI
 args once and branches:
 
-- `--phase` **absent** → `main()` (`main.py`) runs the full production pipeline unconditionally, on
-  `args.input_location`.
+- `--phase` **absent** → `main()` (`main.py`) runs the full production pipeline: `run_all_phases()` (`process.py`),
+  bracketed by an OneDrive download/upload sync (see below).
 - `--phase` **present** (`1`, `2`, or `3` — see `Phase` enum in `defines.py`) → `run_phase()` (`process.py`) runs
   *only* that one stage, via a `phase → zero-arg lambda` dispatch dict built fresh per call. This path exists
   specifically to test one stage in isolation against disposable local fixtures, without touching the rest of the
-  pipeline.
+  pipeline, and does **not** trigger an OneDrive sync.
 
-**Known duplication**: `main()`'s `try` block calls `rename_payments()` then `merge_bills_and_payments()` directly,
-inline — the same two calls that `run_phase()`'s internal `_run_phase_1`/`_run_phase_2` wrap independently in
-`process.py`. These are two separate implementations of "what phase 1/2 do," not one shared one. If asked to add a
-phase or change phase 1/2 behavior, check both places, or consider consolidating `main()` to call into `process.py`'s
-phase machinery instead of re-implementing the sequence.
+`run_phase()` and `run_all_phases()` share one dispatch table (`process.py::_build_phase_map`), so there's a single
+place defining what each phase does — `run_all_phases` just loops `FULL_RUN_PHASES = (Phase.PHASE_1, Phase.PHASE_2)`
+against the same map `run_phase` looks a single key up in. Phase 3 (`mock_phase3`) is reachable via `--phase 3` for
+testing but deliberately excluded from `FULL_RUN_PHASES`, since it's a placeholder, not real logic — don't add it to
+the full-run tuple until it's actually implemented.
 
 ### SAP ID is the correlation key between bills and payments
 
@@ -74,18 +74,27 @@ The pipeline was migrated to a filesystem-only model: `main()` and `process.py` 
 but no current code path reaches it, and `tests/test_sharepoint.py` tests it in isolation from the rest of the
 suite. Don't wire new work through it without confirming that's actually intended.
 
-### OneDrive-for-Linux sync is a documented target design, not yet implemented
+### OneDrive-for-Linux sync brackets the phase pipeline in `main()`
 
-There is no sync step anywhere in the current code — `main()` operates purely on whatever is already on local disk.
-The intended replacement for both the old Graph-based upload path and the `compose.yml` `onedrive --monitor`
-sidecar is two **one-shot** `onedrive --sync --download-only` / `--upload-only` subprocess calls bracketing the
-processing (`main()` calling something like `run_onedrive_sync()` before and after the phase pipeline) — chosen
-specifically to avoid a background sync racing the phase stages' renames/deletes over the same `_input` tree. The
-full design, rationale, and a decision log are in the `docs` git submodule (`ICIQ-DMP/justifactu-docs`,
-`docs/explanation/onedrive_sync_and_orchestration.md`) — read it before touching anything sync-related; it's
-authoritative over any inference from the current code, since the current code hasn't caught up to it yet. The
-draft `Jenkinsfile` at the repo root reflects this target architecture but is explicitly marked not wired into any
-running Jenkins job.
+`main()` calls `run_onedrive_sync()` (`onedrive_sync.py`) twice: once with `direction=SyncDirection.DOWNLOAD.value`
+before `run_all_phases()`, once with `direction=SyncDirection.UPLOAD.value` after it (and after the QA report/log
+get copied into the output tree, so they're included in that upload). Each call shells out to the real `onedrive`
+binary as a **one-shot** `--sync --download-only`/`--upload-only` pass and blocks until it exits — deliberately not
+`onedrive --monitor` (the long-running mode `compose.yml`'s sidecar still uses for local dev), specifically to avoid
+a background sync racing the phase stages' renames/deletes over the same `_input` tree. `subprocess.CalledProcessError`
+and `FileNotFoundError` (binary missing) are both normalized into `MainCriticalError`, so a sync failure is caught by
+`main()`'s existing exception handling the same way a phase failure is — the upload call is only ever reached if
+every prior step succeeded, so SharePoint is never mutated on a failed run.
+
+`confdir` — the directory holding OneDrive's own auth token and sync-state database, distinct from `input_folder`
+— comes from the `OD_CONFDIR` environment variable, defaulting to `/onedrive/conf` if unset. It must be the same
+directory on every invocation (download and upload alike) or OneDrive has no memory of what it already synced.
+
+The `--phase` testing path (above) never calls `run_onedrive_sync` — this sync is only part of the full production
+run. The deeper design rationale and decision log for this two-pass architecture live in the `docs` git submodule
+(`ICIQ-DMP/justifactu-docs`, `docs/explanation/onedrive_sync_and_orchestration.md`); `compose.yml`'s `onedrive`
+sidecar service reflects the *old* architecture being phased out, kept only for local dev per that doc's decision
+log (D18), not the production design.
 
 ### Module layout (only the non-obvious relationships)
 

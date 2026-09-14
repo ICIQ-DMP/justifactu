@@ -40,19 +40,23 @@ def main() -> None:
     configure_logging_from_settings(qa_files_log_file=qa_report_path)
 
     args = process_parse_arguments()
-    input_folder = args.input_location
 
-    confdir = Path(os.environ.get("OD_CONFDIR", "/onedrive/conf"))
+    confdir = Path(
+        os.environ.get("OD_CONFDIR", "/onedrive/conf")
+    )  # TODO: read confdir as a CLI argument, not env var
 
     log.info("Starting...")
 
     try:
-        run_onedrive_sync(confdir, direction="download")
+        run_onedrive_sync(
+            confdir, direction="download"
+        )  # TODO: make this only if args.location == Sharepoint
+        # TODO: direction should be an enum with two possibilities, not a string
 
-        run_all_phases(input_folder)
+        run_all_phases(args.input_location)
 
         bills_plus_payments_folder = (
-            input_folder.parent
+            args.input_location.parent
             / FolderName.OUTPUT.value
             / FolderName.MERGED_OUTPUT.value
         )

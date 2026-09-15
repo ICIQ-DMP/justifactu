@@ -106,8 +106,11 @@ docker-build:  ## Build the Docker image
 docker-push:  ## Push the Docker image
 	@sudo docker push $(DOCKER_IMAGE):latest
 
-docker-phase%:
+docker-phase%: FORCE
 	@sudo docker compose run --rm app --input-location /app/service/onedrive/data --phase $*
+
+FORCE:
+
 # ---- maintenance ----------------------------------------------------------
 
 clean:  ## Remove build/test artifacts
@@ -115,7 +118,7 @@ clean:  ## Remove build/test artifacts
 
 # ---- meta -----------------------------------------------------------------
 
-.PHONY: lint fmt test run clean help dist install docker-build docker-push
+.PHONY: lint fmt test run clean help dist install docker-build docker-push FORCE
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .+$$' $(MAKEFILE_LIST) | \

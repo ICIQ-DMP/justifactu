@@ -40,7 +40,6 @@ def main() -> None:
     configure_logging_from_settings(qa_files_log_file=qa_report_path)
 
     args = process_parse_arguments()
-    input_folder = args.input_location
 
     confdir = Path(os.environ.get("OD_CONFDIR", "/onedrive/conf"))
 
@@ -49,10 +48,10 @@ def main() -> None:
     try:
         run_onedrive_sync(confdir, direction=SyncDirection.DOWNLOAD.value)
 
-        run_all_phases(input_folder)
+        run_all_phases(args.input_location)
 
         bills_plus_payments_folder = (
-            input_folder.parent
+            args.input_location.parent
             / FolderName.OUTPUT.value
             / FolderName.MERGED_OUTPUT.value
         )

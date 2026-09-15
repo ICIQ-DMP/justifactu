@@ -60,7 +60,7 @@ def main() -> None:
         regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
         copy_file(regular_log_path, qa_folder)
 
-        run_onedrive_sync(confdir, direction=SyncDirection.UPLOAD.value)
+        # run_onedrive_sync(confdir, direction=SyncDirection.UPLOAD.value)
 
         log.info("Finished...")
 

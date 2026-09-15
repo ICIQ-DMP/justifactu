@@ -14,38 +14,17 @@
 # COPY of the binary.
 # =============================================================================
 
-# ---- build stage: compile onedrive from a pinned release tag -----------------
-FROM debian:12 AS onedrive-build
-# TODO: confirm the current 2.5.x tag at https://github.com/abraunegg/onedrive/releases
-ARG ONEDRIVE_VERSION=v2.5.6
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential curl ca-certificates pkg-config \
-        libcurl4-openssl-dev libsqlite3-dev ldc && \
-    rm -rf /var/lib/apt/lists/*
-RUN mkdir /src && \
-    curl -fsSL "https://github.com/abraunegg/onedrive/archive/refs/tags/${ONEDRIVE_VERSION}.tar.gz" \
-        | tar xz --strip-components=1 -C /src
-WORKDIR /src
-RUN ./configure && make && make install          # -> /usr/local/bin/onedrive
 
 # ---- agent stage ------------------------------------------------------------
 FROM jenkins/ssh-agent:latest
 
 RUN apt-get update && \
-    apt-get install -y python3 python3-pip python3-venv locales \
-                       libcurl4 libsqlite3-0 ca-certificates && \
+    apt-get install -y python3 python3-pip python3-venv && \
     apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    sed -i '/es_ES.UTF-8/s/^# //' /etc/locale.gen && \
-    locale-gen && \
-    update-locale LANG=es_ES.UTF-8
+    rm -rf /var/lib/apt/lists/*
 
-ENV LANG=es_ES.UTF-8
-ENV LANGUAGE=es_ES:es
-ENV LC_ALL=es_ES.UTF-8
-
-# OneDrive-for-Linux client (pinned build from the stage above; see design doc D6)
-COPY --from=onedrive-build /usr/local/bin/onedrive /usr/local/bin/onedrive
+COPY ./install-onedrive-apt.sh .
+RUN bash install-onedrive-apt.sh
 
 COPY ../entrypoint/entrypoint.sh /entrypoint.sh
 RUN chmod u+x /entrypoint.sh

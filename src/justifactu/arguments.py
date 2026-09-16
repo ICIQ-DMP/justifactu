@@ -42,6 +42,15 @@ def parse_input_location(value: str) -> Path:
     return path
 
 
+def parse_directory(value: str) -> Path:
+    path = Path(value)
+    if not path.exists():
+        path.mkdir(parents=True)
+    if not path.is_dir():
+        raise ArgumentInputLocationError(f"Path {value} is not a directory")
+    return path
+
+
 def parse_phase(value: str) -> Phase:
     try:
         return Phase(value)
@@ -54,7 +63,8 @@ def parse_phase(value: str) -> Phase:
 def parse_arguments() -> argparse.Namespace:
     """Parse and validate command-line arguments"""
     parser = argparse.ArgumentParser(description="Justifactu")
-    DEFAULT_INPUT_LOCATION = ROOT_FOLDER / "service/onedrive/data/justifactu/_input"
+    ONEDRIVE_DATA_FOLDER = ROOT_FOLDER / "service/onedrive/data"
+    SHAREPOINT_SYNC_FOLDER = "justifactu/runtime"
 
     parser.add_argument(
         "-l",
@@ -68,12 +78,42 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "-L",
-        "--input-location",
-        type=parse_input_location,
+        "--onedrive_data_folder",
+        type=parse_directory,
         required=False,
-        default=str(DEFAULT_INPUT_LOCATION),
-        help="Path location of input data.",
+        default=ONEDRIVE_DATA_FOLDER,
+        help="Location for all Onedrive data on local.",
+    )
+
+    parser.add_argument(
+        "--onedrive_conf_folder",
+        type=parse_directory,
+        required=False,
+        default=ROOT_FOLDER / "service/onedrive/conf",
+        help="Location for all Onedrive configuration on local.",
+    )
+
+    parser.add_argument(
+        "--onedrive_logs_folder",
+        type=parse_directory,
+        required=False,
+        default=ROOT_FOLDER / "service/onedrive/logs",
+        help="Location for all Onedrive logs on local.",
+    )
+
+    parser.add_argument(
+        "--sharepoint_sync_folder",
+        type=parse_directory,
+        required=False,
+        default=Path(SHAREPOINT_SYNC_FOLDER),
+        help="Location for all SharePoint synced data on local.",
+    )
+
+    parser.add_argument(
+        "--runtime_location",
+        type=parse_directory,
+        required=False,
+        default=None,
     )
 
     parser.add_argument(
@@ -114,5 +154,8 @@ def process_parse_arguments() -> argparse.Namespace:
         print("Arguments could not have been parsed. Internal error is " + e.__str__())
         print(common)
         exit(5)
+
+    if args.runtime_location is None:
+        args.runtime_location = args.onedrive_data_folder / args.sharepoint_sync_folder
 
     return args

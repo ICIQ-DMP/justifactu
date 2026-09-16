@@ -19,7 +19,12 @@ import sys
 from pathlib import Path
 
 from justifactu.custom_except import ArgumentInputLocationError
-from justifactu.defines import InputLocation, ROOT_FOLDER, Phase
+from justifactu.defines import (
+    InputLocation,
+    ROOT_FOLDER,
+    Phase,
+    FolderPaths,
+)
 
 
 def parse_input_type(value: str) -> InputLocation:
@@ -64,7 +69,6 @@ def parse_arguments() -> argparse.Namespace:
     """Parse and validate command-line arguments"""
     parser = argparse.ArgumentParser(description="Justifactu")
     ONEDRIVE_DATA_FOLDER = ROOT_FOLDER / "service/onedrive/data"
-    SHAREPOINT_SYNC_FOLDER = "justifactu/runtime"
 
     parser.add_argument(
         "-l",
@@ -105,7 +109,7 @@ def parse_arguments() -> argparse.Namespace:
         "--sharepoint_sync_folder",
         type=parse_directory,
         required=False,
-        default=Path(SHAREPOINT_SYNC_FOLDER),
+        default=FolderPaths.SHAREPOINT_SYNC_FOLDER.value,
         help="Location for all SharePoint synced data on local.",
     )
 
@@ -156,6 +160,8 @@ def process_parse_arguments() -> argparse.Namespace:
         exit(5)
 
     if args.runtime_location is None:
-        args.runtime_location = args.onedrive_data_folder / args.sharepoint_sync_folder
+        args.runtime_location = parse_directory(
+            str(args.onedrive_data_folder / args.sharepoint_sync_folder)
+        )
 
     return args

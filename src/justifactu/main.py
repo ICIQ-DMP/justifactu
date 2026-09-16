@@ -18,7 +18,7 @@ from pathlib import Path
 
 from justifactu.onedrive_sync import run_onedrive_sync
 from justifactu.arguments import process_parse_arguments
-from justifactu.defines import NOW, FolderName, SecretNames, SyncDirection
+from justifactu.defines import NOW, FolderName, SecretNames, SyncDirection, FolderPaths
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
@@ -46,7 +46,11 @@ def main() -> None:
     log.info("Starting...")
 
     try:
-        run_onedrive_sync(confdir, direction=SyncDirection.DOWNLOAD.value)
+        run_onedrive_sync(
+            confdir,
+            direction=SyncDirection.DOWNLOAD.value,
+            syncdir=Path(FolderPaths.SHAREPOINT_SYNC_FOLDER.value),
+        )
 
         run_all_phases(args.input_location)
 
@@ -60,7 +64,7 @@ def main() -> None:
         regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
         copy_file(regular_log_path, qa_folder)
 
-        # run_onedrive_sync(confdir, direction=SyncDirection.UPLOAD.value)
+        # run_onedrive_sync(confdir, direction=SyncDirection.UPLOAD.value, syncdir=Path(FolderName.SHAREPOINT_SYNC_FOLDER.value))
 
         log.info("Finished...")
 

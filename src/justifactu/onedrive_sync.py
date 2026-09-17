@@ -23,13 +23,16 @@ from .logger import get_logger
 log = get_logger(__name__)
 
 
-def run_onedrive_sync(confdir: Path, direction: str, syncdir: Path) -> None:
+def run_onedrive_sync(
+    confdir: Path, direction: str, single_dir: Path, data_folder: Path
+) -> None:
     """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits.
 
     Args:
         confdir: Path to the onedrive client's config directory.
         direction: "download" or "upload" — becomes --download-only / --upload-only.
-        syncdir: Path to the onedrive sync's directory.
+        single_dir: Path to the onedrive sync's directory.
+        data_folder: Path to the onedrive sync's data folder.
     Raises:
         MainCriticalError: If the onedrive process exits non-zero, or the
             binary isn't installed.
@@ -44,7 +47,9 @@ def run_onedrive_sync(confdir: Path, direction: str, syncdir: Path) -> None:
                 str(confdir),
                 "--sync",
                 "--single-directory",
-                str(syncdir),
+                str(single_dir),
+                "--data-folder",
+                str(data_folder),
                 f"--{direction}-only",
                 "--verbose",
             ],

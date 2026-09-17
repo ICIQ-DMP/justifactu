@@ -13,12 +13,10 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-import os
-from pathlib import Path
 
 from justifactu.onedrive_sync import run_onedrive_sync
 from justifactu.arguments import process_parse_arguments
-from justifactu.defines import NOW, FolderName, SecretNames, SyncDirection, FolderPaths
+from justifactu.defines import NOW, FolderName, SecretNames, SyncDirection
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
@@ -41,7 +39,7 @@ def main() -> None:
 
     args = process_parse_arguments()
 
-    confdir = Path(os.environ.get("OD_CONFDIR", "/onedrive/conf"))
+    confdir = args.onedrive_conf_folder
 
     log.info("Starting...")
 
@@ -49,7 +47,8 @@ def main() -> None:
         run_onedrive_sync(
             confdir,
             direction=SyncDirection.DOWNLOAD.value,
-            syncdir=Path(FolderPaths.SHAREPOINT_SYNC_FOLDER.value),
+            single_dir=args.sharepoint_sync_folder,
+            data_folder=args.onedrive_data_folder,
         )
 
         run_all_phases(args.input_location)

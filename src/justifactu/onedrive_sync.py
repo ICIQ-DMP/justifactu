@@ -48,7 +48,7 @@ def run_onedrive_sync(
                 "--sync",
                 "--single-directory",
                 str(single_dir),
-                "--data-folder",
+                "--syncdir",
                 str(data_folder),
                 f"--{direction}-only",
                 "--verbose",

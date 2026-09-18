@@ -1,4 +1,4 @@
-sync_dir = "/onedrive/data"
+sync_dir = "/home/dromero/Desktop/justifactu/service/onedrive/data"
 drive_id = "b!ibeLUyPaF0ur1hkrcbhXkzTscZEbiMxGvfoKduTMYDXM1z-EUg0ySZPGcJxj_EoQ"
 
 log_dir = "/onedrive/logs/"

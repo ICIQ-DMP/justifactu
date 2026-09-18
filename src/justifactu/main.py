@@ -51,10 +51,10 @@ def main() -> None:
             data_folder=args.onedrive_data_folder,
         )
 
-        run_all_phases(args.input_location)
+        run_all_phases(args.runtime_location)
 
         bills_plus_payments_folder = (
-            args.input_location.parent
+            args.runtime_location.parent
             / FolderName.OUTPUT.value
             / FolderName.MERGED_OUTPUT.value
         )

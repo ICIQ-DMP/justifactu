@@ -54,7 +54,7 @@ def main() -> None:
         run_all_phases(args.runtime_location)
 
         bills_plus_payments_folder = (
-            args.runtime_location.parent
+            args.runtime_location
             / FolderName.OUTPUT.value
             / FolderName.MERGED_OUTPUT.value
         )

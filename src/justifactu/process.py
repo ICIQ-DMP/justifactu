@@ -125,7 +125,7 @@ def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
     bills_folder = input_folder / FolderName.BILLS_INPUT.value
     payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
     bills_plus_payments_folder = (
-        input_folder.parent / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
+        input_folder / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
     )
     return bills_folder, payments_folder, bills_plus_payments_folder
 

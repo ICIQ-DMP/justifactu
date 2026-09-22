@@ -106,10 +106,10 @@ docker-build:  ## Build the Docker image
 docker-push:  ## Push the Docker image
 	@sudo docker push $(DOCKER_IMAGE):latest
 
-docker-phase%: FORCE
+docker-phase%: FORCE  ## Run a single phase of the project
 	@sudo docker compose run --rm app --input-location /app/service/onedrive/data --phase $*
 
-FORCE:
+FORCE:  ## Helper for docker-phase%
 
 # ---- maintenance ----------------------------------------------------------
 

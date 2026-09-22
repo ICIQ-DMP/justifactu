@@ -48,11 +48,13 @@ class FolderName(StrEnum):
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
     SHAREPOINT_ROOT = "justifactu"
-    INPUT = "_input"
+    RUNTIME = "runtime"
     OUTPUT = "_output"
 
 
-_SHAREPOINT_INPUT_PATH = Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.INPUT.value
+_SHAREPOINT_INPUT_PATH = (
+    Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
+)
 _SHAREPOINT_OUTPUT_PATH = (
     Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.OUTPUT.value
 )

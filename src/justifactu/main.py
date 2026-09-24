@@ -49,6 +49,7 @@ def main() -> None:
             direction=SyncDirection.DOWNLOAD.value,
             single_dir=args.sharepoint_sync_folder,
             data_folder=args.onedrive_data_folder,
+            dry_run=args.dry_run,
         )
 
         run_all_phases(args.runtime_location)
@@ -68,6 +69,7 @@ def main() -> None:
             direction=SyncDirection.UPLOAD.value,
             single_dir=args.sharepoint_sync_folder,
             data_folder=args.onedrive_data_folder,
+            dry_run=args.dry_run,
         )
         log.info("Finished...")
 

@@ -82,6 +82,13 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--dry_run",
+        action="store_true",
+        default=False,
+        help="Preview pending changes without applying them.",
+    )
+
+    parser.add_argument(
         "--onedrive_data_folder",
         type=parse_directory,
         required=False,

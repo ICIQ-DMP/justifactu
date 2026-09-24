@@ -55,9 +55,7 @@ class FolderName(StrEnum):
 _SHAREPOINT_INPUT_PATH = (
     Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
 )
-_SHAREPOINT_OUTPUT_PATH = (
-    Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.OUTPUT.value
-)
+_SHAREPOINT_OUTPUT_PATH = _SHAREPOINT_INPUT_PATH / FolderName.OUTPUT.value
 
 
 class FolderPaths(Enum):

@@ -63,8 +63,12 @@ def main() -> None:
         regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
         copy_file(regular_log_path, qa_folder)
 
-        # run_onedrive_sync(confdir, direction=SyncDirection.UPLOAD.value, syncdir=Path(FolderName.SHAREPOINT_SYNC_FOLDER.value))
-
+        run_onedrive_sync(
+            confdir,
+            direction=SyncDirection.UPLOAD.value,
+            single_dir=args.sharepoint_sync_folder,
+            data_folder=args.onedrive_data_folder,
+        )
         log.info("Finished...")
 
     except MainCriticalError as e:

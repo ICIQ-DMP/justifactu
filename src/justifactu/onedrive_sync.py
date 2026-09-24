@@ -24,7 +24,11 @@ log = get_logger(__name__)
 
 
 def run_onedrive_sync(
-    confdir: Path, direction: str, single_dir: Path, data_folder: Path
+    confdir: Path,
+    direction: str,
+    single_dir: Path,
+    data_folder: Path,
+    dry_run: bool = False,
 ) -> None:
     """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits.
 
@@ -33,6 +37,8 @@ def run_onedrive_sync(
         direction: "download" or "upload" — becomes --download-only / --upload-only.
         single_dir: Path to the onedrive sync's directory.
         data_folder: Path to the onedrive sync's data folder.
+        dry_run: Whether or not to run the sync in dry-run mode.
+
     Raises:
         MainCriticalError: If the onedrive process exits non-zero, or the
             binary isn't installed.
@@ -40,21 +46,24 @@ def run_onedrive_sync(
 
     log.info(f"Starting onedrive {direction} sync...")
     try:
-        subprocess.run(
-            [
-                "onedrive",
-                "--confdir",
-                str(confdir),
-                "--sync",
-                "--single-directory",
-                str(single_dir),
-                "--syncdir",
-                str(data_folder),
-                f"--{direction}-only",
-                "--verbose",
-            ],
-            check=True,
-        )
+        args_list = [
+            "onedrive",
+            "--confdir",
+            str(confdir),
+            "--sync",
+            "--single-directory",
+            str(single_dir),
+            "--syncdir",
+            str(data_folder),
+            f"--{direction}-only",
+            "--verbose",
+        ]
+        if direction == "download":
+            args_list.append("--cleanup-local-files")
+        if dry_run:
+            args_list.append("--dry-run")
+
+        subprocess.run(args_list, check=True)
         log.info(f"OneDrive {direction} sync complete.")
     except subprocess.CalledProcessError as e:
         raise MainCriticalError(

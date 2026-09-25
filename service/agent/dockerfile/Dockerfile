@@ -1,21 +1,19 @@
 # =============================================================================
-# DRAFT — Jenkins agent image for the justifactu scheduled data run.
+# Jenkins agent image for the justifactu scheduled data run.
 #
-# Adds the OneDrive-for-Linux client (abraunegg/onedrive) to the existing agent.
-# The client has no official pre-built binary, so it is compiled from a pinned
-# source tag in a throw-away build stage and the binary is copied in.
+# Adds the OneDrive-for-Linux client (abraunegg/onedrive) to the existing agent,
+# installed via the OpenSuSE Build Service (OBS) community apt repo rather than
+# compiled from source (amended from D6 — the OBS repo resolves the "no
+# properly maintained package" concern that originally motivated compiling).
 #
 # Design and rationale: docs/explanation/onedrive_sync_and_orchestration.md
 #   - Section 6.2  (the pinned agent image)
-#   - Decision D6  (build from a pinned source tag, not apt / not another image)
+#   - Decision D6  (amended — see above)
 #
-# Nothing about the existing Python / locale / entrypoint setup changes; the
-# only additions are the build stage, the onedrive runtime libraries, and the
-# COPY of the binary.
+# Build context: repo root (not this directory). Build with:
+#   docker build -f service/agent/dockerfile/Dockerfile -t justifactu-agent .
 # =============================================================================
 
-
-# ---- agent stage ------------------------------------------------------------
 FROM jenkins/ssh-agent:latest
 
 RUN apt-get update && \
@@ -23,9 +21,9 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY ./install-onedrive-apt.sh .
+COPY install-onedrive-apt.sh .
 RUN bash install-onedrive-apt.sh
 
-COPY ../entrypoint/entrypoint.sh /entrypoint.sh
+COPY service/agent/entrypoint/entrypoint.sh /entrypoint.sh
 RUN chmod u+x /entrypoint.sh
-ENTRYPOINT ["entrypoint.sh"]
+ENTRYPOINT ["/entrypoint.sh"]

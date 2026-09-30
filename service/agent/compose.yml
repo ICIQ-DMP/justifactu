@@ -16,10 +16,6 @@ services:
     secrets:
       - ONEDRIVE_TOKEN
 
-secrets:
-  ONEDRIVE_TOKEN:
-    file: ./secrets/ONEDRIVE_TOKEN
-
 volumes:
   onedrive-conf:
   onedrive-data:

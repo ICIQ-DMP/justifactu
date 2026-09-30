@@ -23,7 +23,3 @@ RUN apt-get update && \
 
 COPY scripts/install-onedrive-apt.sh .
 RUN bash install-onedrive-apt.sh
-
-COPY service/agent/entrypoint/entrypoint.sh /entrypoint.sh
-RUN chmod u+x /entrypoint.sh
-ENTRYPOINT ["/entrypoint.sh"]

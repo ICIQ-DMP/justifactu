@@ -44,6 +44,16 @@ def main() -> None:
     log.info("Starting...")
 
     try:
+        if args.auth is not None:
+            run_onedrive_sync(
+                confdir,
+                direction=SyncDirection.DOWNLOAD.value,
+                single_dir=args.sharepoint_sync_folder,
+                data_folder=args.onedrive_data_folder,
+                dry_run=True,
+            )
+            exit(0)
+
         run_onedrive_sync(
             confdir,
             direction=SyncDirection.DOWNLOAD.value,

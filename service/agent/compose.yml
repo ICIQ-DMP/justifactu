@@ -20,6 +20,11 @@ services:
       - vault.crt
     networks:
       - justicier_justicier_net  # TODO: change into a network not owned by the justicier project
+    healthcheck:
+      test: bash -c 'exec 3<>/dev/tcp/localhost/22'
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
 
 volumes:

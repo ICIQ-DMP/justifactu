@@ -21,7 +21,7 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-COPY install-onedrive-apt.sh .
+COPY scripts/install-onedrive-apt.sh .
 RUN bash install-onedrive-apt.sh
 
 COPY service/agent/entrypoint/entrypoint.sh /entrypoint.sh

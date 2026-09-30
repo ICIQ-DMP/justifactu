@@ -16,7 +16,7 @@ SHELL := bash
 
 # Check if python3.11 exists, otherwise default to python3, otherwise default to python
 ifneq ($(shell command -v python3.11 2> /dev/null),)
-    PYTHON_BIN ?= python3.14
+    PYTHON_BIN ?= python3.11
 else
     ifneq ($(shell command -v python3 2> /dev/null),)
         PYTHON_BIN ?= python3
@@ -27,7 +27,7 @@ endif
 
 VENV_DIR   ?= venv
 VENV_BIN   ?= $(VENV_DIR)/bin
-PYTHON     := $(VENV_BIN)/python
+PYTHON     := $(VENV_BIN)/$(PYTHON_BIN)
 PIP        := $(VENV_BIN)/pip
 
 PKG_NAME   := justifactu
@@ -39,19 +39,19 @@ DEV_STAMP := $(VENV_DIR)/.dev-installed
 # ---- helpers --------------------------------------------------------------
 
 # Create virtualenv
-$(VENV_BIN)/python:
+$(VENV_BIN)/$(PYTHON_BIN):
 	@$(PYTHON_BIN) -m venv "$(VENV_DIR)"
 	@$(PYTHON_BIN) -m pip install --upgrade pip
 
 # Install runtime dependencies (creates justifactu executable)
-$(VENV_BIN)/justifactu: $(VENV_BIN)/python pyproject.toml
+$(VENV_BIN)/justifactu: $(VENV_BIN)/$(PYTHON_BIN) pyproject.toml
 	@$(PIP) install -e .
 
 # Install dev dependencies
 # We use PKG-INFO as the target because pip updates it when dependencies change.
 # This avoids the loop where 'make fmt && make lint' rebuilds twice because binaries
 # like 'bin/ruff' might not have their timestamp updated by pip if they are already present.
-$(DEV_STAMP): pyproject.toml $(VENV_BIN)/python
+$(DEV_STAMP): pyproject.toml $(VENV_BIN)/$(PYTHON_BIN)
 	@$(PIP) install -e "."
 	@$(PIP) install -e ".[dev]"
 	@touch $(DEV_STAMP)
@@ -67,11 +67,11 @@ $(DEV_STAMP): pyproject.toml $(VENV_BIN)/python
 
 
 # Install build tool
-$(VENV_BIN)/pyproject-build: $(VENV_BIN)/python
+$(VENV_BIN)/pyproject-build: $(VENV_BIN)/$(PYTHON_BIN)
 	@$(PIP) install build
 
 # Phony aliases
-venv: $(VENV_BIN)/python  ## Create virtualenv
+venv: $(VENV_BIN)/$(PYTHON_BIN)  ## Create virtualenv
 	@echo "✅ venv ready at $(VENV_DIR)"
 
 install: $(VENV_BIN)/justifactu  ## Install package in editable mode

@@ -28,15 +28,15 @@ services:
 
 secrets:
   VAULT_ADDR:
-    file: ./secrets/VAULT_ADDR
+    file: ../../secrets/VAULT_ADDR
   VAULT_CACERT:
-    file: ./secrets/VAULT_CACERT
+    file: ../../secrets/VAULT_CACERT
   VAULT_ROLE_ID:
-    file: ./secrets/VAULT_ROLE_ID
+    file: ../../secrets/VAULT_ROLE_ID
   VAULT_SECRET_ID:
-    file: ./secrets/VAULT_SECRET_ID
+    file: ../../secrets/VAULT_SECRET_ID
   vault.crt:
-    file: ./secrets/vault.crt
+    file: ../../secrets/vault.crt
 
 
 volumes:

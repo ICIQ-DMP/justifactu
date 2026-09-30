@@ -87,12 +87,13 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--dry_run",
+        "--dry-run",
         action="store_true",
         default=False,
         help="Preview pending changes without applying them.",
     )
 
+    # TODO: the standard is to have hyphen (-) as separator of words for long word arguments
     parser.add_argument(
         "--onedrive_data_folder",
         type=parse_directory,

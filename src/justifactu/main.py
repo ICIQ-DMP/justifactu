@@ -45,6 +45,7 @@ def main() -> None:
 
     try:
         if args.auth is not None:
+            # TODO: make this only if args.location == Sharepoint
             run_onedrive_sync(
                 confdir,
                 direction=SyncDirection.DOWNLOAD.value,

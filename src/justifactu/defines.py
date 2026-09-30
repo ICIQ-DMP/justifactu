@@ -42,7 +42,7 @@ class SyncDirection(StrEnum):
 class FolderName(StrEnum):
     """Named folders used across the pipeline."""
 
-    BILLS_INPUT = "FACTURES_prova"
+    BILLS_INPUT = "FACTURES_prova"  # TODO: Remove when entering into production
     PAYMENTS_INPUT = "Remeses_prova"
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"

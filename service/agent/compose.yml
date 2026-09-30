@@ -3,7 +3,7 @@ services:
     build:
       context: ../..
       dockerfile: service/agent/dockerfile/Dockerfile
-    hostname: justifactu-agent
+    container_name: justifactu-agent
     restart: unless-stopped
     ports:
       - "2200:22"

@@ -78,7 +78,7 @@ pipeline {
         // D15 — notify once, here, rather than with try/catch around stages.
         failure {
             emailext(
-                to: 'digitalitzacio@iciq.es',
+                to: 'dromero@iciq.es',
                 subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: "Build failed or was aborted.\n\nConsole: ${env.BUILD_URL}console",
                 attachLog: true
@@ -86,7 +86,7 @@ pipeline {
         }
         aborted {
             emailext(
-                to: 'digitalitzacio@iciq.es',
+                to: 'dromero@iciq.es',
                 subject: "ABORTED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
                 body: "Build aborted (most likely the 20h timeout during the initial sync).\n" +
                       "OneDrive saved its resume state; the next scheduled run continues.\n\n" +

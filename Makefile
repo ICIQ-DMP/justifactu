@@ -116,9 +116,19 @@ FORCE:  ## Helper for docker-phase%
 clean:  ## Remove build/test artifacts
 	@rm -rf .pytest_cache .mypy_cache .ruff_cache dist build *.egg-info src/*.egg-info "$(VENV_DIR)"
 
+# ---- agent ----------------------------------------------------------------
+
+AGENT_COMPOSE := service/agent/compose.yml
+
+prodbuild:  ## Build the production Jenkins agent image
+	@sudo docker compose -f $(AGENT_COMPOSE) build
+
+prodrun: prodbuild  ## Start the production Jenkins agent (detached)
+	@sudo docker compose -f $(AGENT_COMPOSE) up -d
+
 # ---- meta -----------------------------------------------------------------
 
-.PHONY: lint fmt test run clean help dist install docker-build docker-push FORCE
+.PHONY: lint fmt test run clean help dist install docker-build docker-push FORCE prodbuild prodrun
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .+$$' $(MAKEFILE_LIST) | \

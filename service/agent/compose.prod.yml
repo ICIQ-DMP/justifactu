@@ -1,0 +1,25 @@
+services:
+  jenkins-agent:
+    build:
+      context: ../..
+      dockerfile: service/agent/dockerfile/Dockerfile
+    hostname: justifactu-agent
+    restart: unless-stopped
+    ports:
+      - "2200:22"
+    environment:
+      ONEDRIVE_CONF_DIR: /onedrive/conf
+      SECRETS_DIR: /run/secrets
+    volumes:
+      - onedrive-conf:/onedrive/conf
+      - onedrive-data:/onedrive/data
+    secrets:
+      - ONEDRIVE_TOKEN
+
+secrets:
+  ONEDRIVE_TOKEN:
+    file: ./secrets/ONEDRIVE_TOKEN
+
+volumes:
+  onedrive-conf:
+  onedrive-data:

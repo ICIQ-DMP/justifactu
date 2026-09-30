@@ -18,13 +18,27 @@ services:
       - VAULT_ROLE_ID
       - VAULT_SECRET_ID
       - vault.crt
-    networks:
-      - justicier_justicier_net  # TODO: change into a network not owned by the justicier project
+    networks:  # TODO: change into a network not owned by the justicier project when jenkins is decoupled from it
+      - justicier_justicier_net
     healthcheck:
       test: bash -c 'exec 3<>/dev/tcp/localhost/22'
       interval: 30s
       timeout: 5s
       retries: 3
+
+secrets:
+  VAULT_ADDR:
+    file: ./secrets/VAULT_ADDR
+  VAULT_CACERT:
+    file: ./secrets/VAULT_CACERT
+  VAULT_ROLE_ID:
+    file: ./secrets/VAULT_ROLE_ID
+  VAULT_SECRET_ID:
+    file: ./secrets/VAULT_SECRET_ID
+  vault.crt:
+    file: ./secrets/vault.crt
+
+
 
 
 volumes:

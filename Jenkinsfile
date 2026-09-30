@@ -35,7 +35,7 @@ pipeline {
                 sh '''
                     set -eu
                     make install
-                    make run CMD="--dry-run"
+                    make run CMD="--dry-run"  # TODO: remove when we enter into production
                 '''
             }
         }

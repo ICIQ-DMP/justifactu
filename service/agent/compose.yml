@@ -13,7 +13,12 @@ services:
       - onedrive-conf:/onedrive/conf
       - onedrive-data:/onedrive/data
     secrets:
-      - ONEDRIVE_TOKEN
+      - VAULT_ADDR
+      - VAULT_CACERT
+      - VAULT_ROLE_ID
+      - VAULT_SECRET_ID
+      - vault.crt
+
 
 volumes:
   onedrive-conf:

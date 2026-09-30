@@ -96,7 +96,7 @@ You may follow these steps to get a local copy up and running.
 
 ## Deploy to production                                                                                                                                                                                                                                                                                                                            
 
-TODO: move into docs 
+TODO: move into docs, and makefile target
 
 Generate keys:                                                                                                                                                                                                                                                                                                                                     
 ```shell                                                                                                                                                                                                                                                                                                                                           

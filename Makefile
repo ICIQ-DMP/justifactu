@@ -14,11 +14,15 @@ SHELL := bash
 
 # ---- config ---------------------------------------------------------------
 
-# Check if python3.11 exists, otherwise default to python
+# Check if python3.11 exists, otherwise default to python3, otherwise default to python
 ifneq ($(shell command -v python3.11 2> /dev/null),)
-    PYTHON_BIN ?= python3.11
+    PYTHON_BIN ?= python3.14
 else
-    PYTHON_BIN ?= python
+    ifneq ($(shell command -v python3 2> /dev/null),)
+        PYTHON_BIN ?= python3
+    else
+        PYTHON_BIN ?= python
+    endif
 endif
 
 VENV_DIR   ?= venv

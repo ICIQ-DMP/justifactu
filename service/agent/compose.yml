@@ -18,6 +18,8 @@ services:
       - VAULT_ROLE_ID
       - VAULT_SECRET_ID
       - vault.crt
+    networks:
+      - justicier_justicier_net  # TODO: change into a network not owned by the justicier project
 
 
 volumes:

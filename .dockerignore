@@ -14,7 +14,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-.env
+service/agent/.env
 .git
 .gitignore
 .venv

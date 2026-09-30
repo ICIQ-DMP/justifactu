@@ -94,6 +94,23 @@ You may follow these steps to get a local copy up and running.
     make install 
     ```
 
+## Deploy to production                                                                                                                                                                                                                                                                                                                            
+
+TODO: move into docs 
+
+Generate keys:                                                                                                                                                                                                                                                                                                                                     
+```shell                                                                                                                                                                                                                                                                                                                                           
+ssh-keygen -t ed25519 -C "jenkins@imarina-load-researchers-agent" -N "" -f service/agent/keys/id_rsa                                                                                                                                                                                        
+```                                                                                                                                                                                                                                                                                                                                                
+                                                                                                                                                                                                                                                                                                                                                   
+Copy the public key into .env.                                                                                                                                                                                                                                                                                                                     
+                                                                                                                                                                                                                                                                                                                                                   
+Enter into jenkins, create or modify agent, and select                                                                                                                                                                                                                                                                                             
+                                                                                                                                                                                                                                                                                                                                                   
+```shell                                                                                                                                                                                                                                                                                                                                           
+docker compose -f compose.prod.yml up --build --remove-orphans                                                                                                                                                                                                                                                                                     
+```                
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 

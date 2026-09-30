@@ -16,11 +16,8 @@
 pipeline {
     agent { label 'justifactu' }                 // D5 — one pinned agent: it alone has onedrive + the volumes
 
-    triggers { cron('H 3 * * *') }               // D13 — periodic; the Jenkins job must have SCM-push triggers disabled
-
     options {
         disableConcurrentBuilds()                // D4 — replaces any lock file; there is no monitor to coordinate with
-       // timeout(time: 20, unit: 'HOURS')         // D14 — shorter than the cron interval, so an unfinished sync yields
         buildDiscarder(logRotator(numToKeepStr: '30'))
         timestamps()
     }
@@ -38,7 +35,7 @@ pipeline {
                 sh '''
                     set -eu
                     make install
-                    make run CMD=""
+                    make run CMD="--dry-run"
                 '''
             }
         }

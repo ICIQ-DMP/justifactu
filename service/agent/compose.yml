@@ -12,6 +12,11 @@ services:
     volumes:
       - justifactu-onedrive-conf:/onedrive/conf
       - justifactu-onedrive-data:/onedrive/data
+      - type: bind
+        source: keys
+        target: /home/jenkins/.ssh
+        read_only: false
+
     secrets:
       - VAULT_ADDR
       - VAULT_CACERT

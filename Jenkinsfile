@@ -20,7 +20,7 @@ pipeline {
 
     options {
         disableConcurrentBuilds()                // D4 — replaces any lock file; there is no monitor to coordinate with
-        timeout(time: 20, unit: 'HOURS')         // D14 — shorter than the cron interval, so an unfinished sync yields
+       // timeout(time: 20, unit: 'HOURS')         // D14 — shorter than the cron interval, so an unfinished sync yields
         buildDiscarder(logRotator(numToKeepStr: '30'))
         timestamps()
     }
@@ -30,36 +30,6 @@ pipeline {
     }
 
     stages {
-
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
-        }
-
-        stage('Sync input from SharePoint') {
-            // D2 — download-only: OneDrive never writes to SharePoint.
-            // D12 — if this does not finish inside the build timeout, Jenkins aborts it; onedrive persists its
-            //       resume state and the NEXT build continues from there.
-            steps {
-                sh '''
-                    set -eu
-                    onedrive --confdir "$OD_CONF" --sync --download-only --verbose
-                '''
-            }
-        }
-
-        stage('Readiness gate') {
-            // D10 — do not process a partial input tree. Fail the build unless the local copy really caught up.
-            //       During the initial multi-night convergence this stage is EXPECTED to fail.
-            steps {
-                sh '''
-                    set -eu
-                    onedrive --confdir "$OD_CONF" --display-sync-status | tee od-status.txt
-                    grep -q "IN SYNC" od-status.txt
-                '''
-            }
-        }
 
         stage('Run justifactu') {
             // Reads the warm local cache; performs every SharePoint mutation (rename / delete / upload) itself

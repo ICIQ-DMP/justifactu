@@ -82,6 +82,11 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
+        "--auth",
+        help="Runs the program once to authenticate with the OneDrive API.",
+    )
+
+    parser.add_argument(
         "--dry_run",
         action="store_true",
         default=False,

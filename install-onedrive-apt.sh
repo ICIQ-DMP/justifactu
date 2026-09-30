@@ -20,7 +20,15 @@ command -v apt-get >/dev/null 2>&1 || die "this script targets Debian/Ubuntu (ap
 . /etc/os-release
 [ -n "${VERSION_ID:-}" ] || die "could not determine VERSION_ID from /etc/os-release"
 
-REPO_URL="${OBS_BASE}/xUbuntu_${VERSION_ID}"
+if [ "${NAME}" == "Ubuntu" ]; then
+  NORMALIZED_NAME="xUbuntu"
+elif [ "${NAME}" == "Debian GNU/Linux" ]; then
+  NORMALIZED_NAME="Debian"
+else
+  die "not supported version of the OS"
+fi
+
+REPO_URL="${OBS_BASE}/${NORMALIZED_NAME}_${VERSION_ID}"
 log "Target repo: $REPO_URL"
 
 # ---- 0. ensure the tools this script itself needs are present --------------

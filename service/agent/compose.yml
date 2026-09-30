@@ -40,8 +40,8 @@ secrets:
 
 
 volumes:
-  onedrive-conf:
-  onedrive-data:
+  justifactu-onedrive-conf:
+  justifactu-onedrive-data:
 
 
 networks:  # TODO: change into a network not owned by the justicier project when jenkins is decoupled from it

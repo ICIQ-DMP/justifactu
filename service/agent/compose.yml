@@ -5,8 +5,8 @@ services:
       dockerfile: service/agent/dockerfile/Dockerfile
     container_name: justifactu-agent
     restart: unless-stopped
-    ports:
-      - "2200:22"
+    expose:
+      - ${AGENT_PORT_INTERNAL}
     environment:
       ONEDRIVE_CONF_DIR: /onedrive/conf
       SECRETS_DIR: /run/secrets

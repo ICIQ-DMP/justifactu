@@ -41,7 +41,7 @@ DEV_STAMP := $(VENV_DIR)/.dev-installed
 # Create virtualenv
 $(VENV_BIN)/$(PYTHON_BIN):
 	@$(PYTHON_BIN) -m venv "$(VENV_DIR)"
-	@$(PYTHON_BIN) -m pip install --upgrade pip
+	@$(PYTHON) -m pip install --upgrade pip
 
 # Install runtime dependencies (creates justifactu executable)
 $(VENV_BIN)/justifactu: $(VENV_BIN)/$(PYTHON_BIN) pyproject.toml

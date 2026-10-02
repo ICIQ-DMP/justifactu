@@ -24,7 +24,7 @@ services:
       - VAULT_SECRET_ID
       - vault.crt
     networks:  # TODO: change into a network not owned by the justicier project when jenkins is decoupled from it
-      - justicier_justicier_net
+      - justifactu_justifactu_net
     healthcheck:
       test: bash -c 'exec 3<>/dev/tcp/localhost/22'
       interval: 30s

@@ -93,9 +93,8 @@ def parse_arguments() -> argparse.Namespace:
         help="Preview pending changes without applying them.",
     )
 
-    # TODO: the standard is to have hyphen (-) as separator of words for long word arguments
     parser.add_argument(
-        "--onedrive_data_folder",
+        "--onedrive-data-folder",
         type=parse_directory,
         required=False,
         default=ONEDRIVE_DATA_FOLDER,
@@ -103,7 +102,7 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--onedrive_conf_folder",
+        "--onedrive-conf-folder",
         type=parse_directory,
         required=False,
         default=ROOT_FOLDER / "service/onedrive/conf",
@@ -111,7 +110,7 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--onedrive_logs_folder",
+        "--onedrive-logs-folder",
         type=parse_directory,
         required=False,
         default=ROOT_FOLDER / "service/onedrive/logs",
@@ -119,7 +118,7 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--sharepoint_sync_folder",
+        "--sharepoint-sync-folder",
         type=parse_directory,
         required=False,
         default=FolderPaths.SHAREPOINT_SYNC_FOLDER.value,
@@ -127,7 +126,7 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--runtime_location",
+        "--runtime-location",
         type=parse_directory,
         required=False,
         default=None,

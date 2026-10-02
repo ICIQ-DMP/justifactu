@@ -14,9 +14,15 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from justifactu.onedrive_sync import run_onedrive_sync
+from justifactu.onedrive_sync import run_onedrive_sync, run_onedrive_auth
 from justifactu.arguments import process_parse_arguments
-from justifactu.defines import NOW, FolderName, SecretNames, SyncDirection
+from justifactu.defines import (
+    NOW,
+    FolderName,
+    SecretNames,
+    SyncDirection,
+    InputLocation,
+)
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
@@ -44,14 +50,9 @@ def main() -> None:
     log.info("Starting...")
 
     try:
-        if args.auth is not None:
-            # TODO: make this only if args.location == Sharepoint
-            run_onedrive_sync(
-                confdir,
-                direction=SyncDirection.DOWNLOAD.value,
-                single_dir=args.sharepoint_sync_folder,
-                data_folder=args.onedrive_data_folder,
-                dry_run=True,
+        if args.auth is not None and args.location == InputLocation.SHAREPOINT:
+            run_onedrive_auth(
+                confdir, args.sharepoint_sync_folder, args.onedrive_data_folder
             )
             exit(0)
 

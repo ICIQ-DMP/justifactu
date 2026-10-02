@@ -23,6 +23,47 @@ from .logger import get_logger
 log = get_logger(__name__)
 
 
+def _base_onedrive_args(
+    confdir: Path, single_dir: Path, data_folder: Path
+) -> list[str]:
+    """Flags shared by every onedrive invocation, sync or auth-only."""
+    return [
+        "onedrive",
+        "--confdir",
+        str(confdir),
+        "--single-directory",
+        str(single_dir),
+        "--syncdir",
+        str(data_folder),
+        "--verbose",
+    ]
+
+
+def run_onedrive_auth(confdir: Path, single_dir: Path, data_folder: Path) -> None:
+    """Authenticates against the OneDrive API without syncing anything.
+
+    Omits --sync and --monitor entirely — onedrive only validates/refreshes
+    its credentials (prompting for interactive auth on a fresh confdir) and
+    exits, with no delta assessment or file transfer.
+
+    Raises:
+        MainCriticalError: If the onedrive process exits non-zero, or the
+            binary isn't installed.
+    """
+    log.info("Authenticating with OneDrive...")
+    try:
+        subprocess.run(
+            _base_onedrive_args(confdir, single_dir, data_folder), check=True
+        )
+        log.info("OneDrive authentication complete.")
+    except subprocess.CalledProcessError as e:
+        raise MainCriticalError(
+            f"OneDrive authentication failed with code {e.returncode}."
+        ) from e
+    except FileNotFoundError as e:
+        raise MainCriticalError("onedrive binary not found on PATH") from e
+
+
 def run_onedrive_sync(
     confdir: Path,
     direction: str,
@@ -30,34 +71,11 @@ def run_onedrive_sync(
     data_folder: Path,
     dry_run: bool = False,
 ) -> None:
-    """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits.
-
-    Args:
-        confdir: Path to the onedrive client's config directory.
-        direction: "download" or "upload" — becomes --download-only / --upload-only.
-        single_dir: Path to the onedrive sync's directory.
-        data_folder: Path to the onedrive sync's data folder.
-        dry_run: Whether or not to run the sync in dry-run mode.
-
-    Raises:
-        MainCriticalError: If the onedrive process exits non-zero, or the
-            binary isn't installed.
-    """
-
+    """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits."""
     log.info(f"Starting onedrive {direction} sync...")
     try:
-        args_list = [
-            "onedrive",
-            "--confdir",
-            str(confdir),
-            "--sync",
-            "--single-directory",
-            str(single_dir),
-            "--syncdir",
-            str(data_folder),
-            f"--{direction}-only",
-            "--verbose",
-        ]
+        args_list = _base_onedrive_args(confdir, single_dir, data_folder)
+        args_list += ["--sync", f"--{direction}-only"]
         if direction == "download":
             args_list.append("--cleanup-local-files")
         if dry_run:

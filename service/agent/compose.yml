@@ -50,5 +50,5 @@ volumes:
 
 
 networks:  # TODO: change into a network not owned by the justicier project when jenkins is decoupled from it
-  justicier_justicier_net:
+  justifactu_justifactu_net:
     external: true

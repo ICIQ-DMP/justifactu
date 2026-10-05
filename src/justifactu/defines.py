@@ -50,6 +50,7 @@ class FolderName(StrEnum):
     SHAREPOINT_ROOT = "justifactu"
     RUNTIME = "runtime"
     OUTPUT = "_output"
+    AUTH_SYNC = "_auth_sync"
 
 
 _SHAREPOINT_INPUT_PATH = (
@@ -65,7 +66,12 @@ class FolderPaths(Enum):
     SHAREPOINT_OUTPUT_PATH = _SHAREPOINT_OUTPUT_PATH
     SHAREPOINT_BILLS_PATH = _SHAREPOINT_INPUT_PATH / FolderName.BILLS_INPUT.value
     SHAREPOINT_PAYMENTS_PATH = _SHAREPOINT_INPUT_PATH / FolderName.PAYMENTS_INPUT.value
-    SHAREPOINT_SYNC_FOLDER = "justifactu/runtime"
+    SHAREPOINT_SYNC_FOLDER = (
+        Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
+    )
+    SHAREPOINT_AUTH_PATH = (
+        Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.AUTH_SYNC.value
+    )
 
 
 class Phase(StrEnum):

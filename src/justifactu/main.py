@@ -14,7 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from justifactu.onedrive_sync import run_onedrive_sync, run_onedrive_auth
+from justifactu.onedrive_sync import run_onedrive_sync
 from justifactu.arguments import process_parse_arguments
 from justifactu.defines import (
     NOW,
@@ -22,6 +22,7 @@ from justifactu.defines import (
     SecretNames,
     SyncDirection,
     InputLocation,
+    FolderPaths,
 )
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
@@ -51,8 +52,12 @@ def main() -> None:
 
     try:
         if args.auth is not None and args.location == InputLocation.SHAREPOINT:
-            run_onedrive_auth(
-                confdir, args.sharepoint_sync_folder, args.onedrive_data_folder
+            run_onedrive_sync(
+                confdir,
+                direction=SyncDirection.DOWNLOAD.value,
+                single_dir=FolderPaths.SHAREPOINT_AUTH_PATH.value,
+                data_folder=args.onedrive_data_folder,
+                dry_run=False,
             )
             exit(0)
 

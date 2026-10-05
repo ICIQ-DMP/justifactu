@@ -39,31 +39,6 @@ def _base_onedrive_args(
     ]
 
 
-def run_onedrive_auth(confdir: Path, single_dir: Path, data_folder: Path) -> None:
-    """Authenticates against the OneDrive API without syncing anything.
-
-    Omits --sync and --monitor entirely — onedrive only validates/refreshes
-    its credentials (prompting for interactive auth on a fresh confdir) and
-    exits, with no delta assessment or file transfer.
-
-    Raises:
-        MainCriticalError: If the onedrive process exits non-zero, or the
-            binary isn't installed.
-    """
-    log.info("Authenticating with OneDrive...")
-    try:
-        subprocess.run(
-            _base_onedrive_args(confdir, single_dir, data_folder), check=True
-        )
-        log.info("OneDrive authentication complete.")
-    except subprocess.CalledProcessError as e:
-        raise MainCriticalError(
-            f"OneDrive authentication failed with code {e.returncode}."
-        ) from e
-    except FileNotFoundError as e:
-        raise MainCriticalError("onedrive binary not found on PATH") from e
-
-
 def run_onedrive_sync(
     confdir: Path,
     direction: str,

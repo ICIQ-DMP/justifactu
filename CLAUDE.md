@@ -53,6 +53,10 @@ does — `run_all_phases` loops `FULL_RUN_PHASES = (Phase.PHASE_1, Phase.PHASE_2
 looks a single key up in. Phase 3 (`mock_phase3`) is reachable via `--phase 3` for testing but deliberately excluded
 from `FULL_RUN_PHASES`, since it's a placeholder — don't add it to the full-run tuple until it's actually implemented.
 
+`__main__.py` passes `args.runtime_location` (not `args.input_location`, which never existed as a CLI attribute)
+to `run_phase` — a prior mismatch between this call and what `arguments.py` actually produces was fixed in commit
+`aa7dd21`.
+
 ### SAP ID is the correlation key between bills and payments
 
 A bill and a payment are matched purely by a shared `SAP_ID` (`SAP_ID.py`) — a 4-digit year + 6-digit sequence,
@@ -68,21 +72,31 @@ matched pair into one PDF under `{year}_FACTURA+PAGAMENT/{sap_id}_F_P.pdf`, then
 the payment with a `_merged` suffix and deletes the bill. An unmatched bill isn't necessarily an error — it's
 routed to a separate, not-yet-implemented "own treatment" flow (`mock_phase3`).
 
-### SharePoint/Graph API code: mostly dead, but not entirely anymore
+### SharePoint/Graph API code: removed, with one orphan left behind
 
-`sharepoint.py`'s file-transfer functions (`download_input_folder`, `upload_folder_recursive`, `rename_file_remote`,
-`delete_file_remote`, etc.) and `token_manager.py` are still **unreachable from any production code path** — OneDrive-
-for-Linux replaced direct Microsoft Graph calls for every file operation. Don't wire new work through them without
-confirming that's actually intended. (The SharePoint-*list*-specific code — `get_list_id` and its tests — was
-removed outright as genuinely dead weight, rather than kept around; see commits `a4514d2`/`7fca48b`.)
+`sharepoint.py` and `tests/test_sharepoint.py` are **gone entirely** (commit `ae2474f`) — OneDrive-for-Linux replaced
+every direct Microsoft Graph file-transfer call, and the module had no production importer left (only its own
+tests used it). Along with it, `defines.py::FolderPaths` lost its four dead members (`SHAREPOINT_INPUT_PATH`,
+`SHAREPOINT_OUTPUT_PATH`, `SHAREPOINT_BILLS_PATH`, `SHAREPOINT_PAYMENTS_PATH`), and `custom_except.py` lost two
+never-raised exceptions (`SkippedPdfRenamingInvalidSapId`, `UnexpectedRenamingError`), and `logger.py` lost two
+never-called functions (`obfuscate_text`, `process_log_flags`).
 
-**What's no longer dead, though:** `InputLocation` (`defines.py`) and the `-l/--location` CLI flag are back in active
-use — `main.py`'s one-time `--auth` bootstrap is gated on `args.location == InputLocation.SHAREPOINT` (see below).
-`FolderPaths` (`defines.py`) is also fully live — `SHAREPOINT_SYNC_FOLDER` and `SHAREPOINT_AUTH_PATH` feed real CLI
-defaults consumed by every OneDrive sync call. Don't assume everything derived from the old SharePoint/Graph era is
-inert; check whether it's referenced from `arguments.py`/`main.py` before treating it as legacy.
+**`token_manager.py` was not removed, and is now fully orphaned** — its only importer was `sharepoint.py`. Nothing
+in `src/` or `tests/` references it anymore. Treat it as the next thing to delete, not as still-needed.
 
-`--download-input` (`arguments.py`) is still unused by any code path — that one genuinely is dead.
+Two smaller known-dead leftovers from the same sweep, also not yet removed: `arguments.py::parse_input_location`
+(superseded by `parse_directory`'s auto-create behavior everywhere; only its own tests call it) and
+`filesystem.py::move_file` (tested in isolation, but no production code path calls it — `main.py`/`process.py`/
+`payments.py` use `copy_file`/`change_file_name` instead).
+
+`FolderPaths` (`defines.py`) is now fully live top to bottom — `SHAREPOINT_SYNC_FOLDER` and `SHAREPOINT_AUTH_PATH`
+feed real CLI defaults consumed by every OneDrive sync call, and nothing else remains on the enum. `InputLocation`
+and the `-l/--location` CLI flag are likewise in active use — `main.py`'s one-time `--auth` bootstrap is gated on
+`args.location == InputLocation.SHAREPOINT` (see below).
+
+`--download-input` (`arguments.py`) was removed outright in commit `aa7dd21` — it was parsed but never read by any
+code path. `--onedrive-logs-folder` was removed in the same cleanup, for the same reason (it was never passed to
+the `onedrive` subprocess, and structurally couldn't be — there's no `log_dir` CLI equivalent in OneDrive-for-Linux).
 
 ### OneDrive-for-Linux sync brackets the phase pipeline in `main()`
 
@@ -113,16 +127,21 @@ those were **removed from the config file entirely**, since a static `download_o
 
 **Two hard `onedrive` CLI constraints, confirmed the hard way, worth knowing before changing this code:**
 - Every invocation requires exactly one of `--sync`/`--monitor` — there is no flag-free "just check credentials"
-  mode, regardless of what other flags are present.
+  mode, regardless of what other flags are present. (This was re-checked against the upstream docs during this
+  round of work — a *literally bare* `onedrive --confdir <dir>` invocation, with no `--single-directory`/`--syncdir`
+  at all, is documented upstream as the supported way to do first-time interactive auth without triggering this
+  error. That's a real discrepancy with what's stated here; it hasn't been re-tested against this project's actual
+  installed `onedrive` build yet, so don't change the `--auth` bootstrap on the strength of the docs alone.)
 - `--dry-run` never persists a freshly-obtained OAuth token to disk — only a real (non-dry-run) sync does.
 
-**The one-time `--auth` bootstrap** (`main.py`, gated on `args.auth is not None and args.location ==
-InputLocation.SHAREPOINT`) exists because of both constraints above: it's a real `run_onedrive_sync(..., dry_run=
-False)` call (not a bespoke auth-only function — an earlier `run_onedrive_auth` attempt was removed, since no
-flag-free invocation actually works), scoped via `--single-directory` to `FolderPaths.SHAREPOINT_AUTH_PATH`
-(`justifactu/_auth_sync`) — a dedicated, deliberately-empty folder, so the real sync pass has nothing to transfer
-while still being "real" enough to persist the resulting token. `exit(0)` immediately after, so phases/upload never
-run in this mode.
+**The one-time `--auth` bootstrap** (`main.py`, now gated on plain `args.auth and args.location ==
+InputLocation.SHAREPOINT` — `--auth` became a `store_true` flag in commit `aa7dd21`, replacing the earlier
+value-taking flag that was only ever checked via `is not None`) exists because of both constraints above: it's a
+real `run_onedrive_sync(..., dry_run=False)` call (not a bespoke auth-only function — an earlier `run_onedrive_auth`
+attempt was removed, since no flag-free invocation actually works), scoped via `--single-directory` to
+`FolderPaths.SHAREPOINT_AUTH_PATH` (`justifactu/_auth_sync`) — a dedicated, deliberately-empty folder, so the real
+sync pass has nothing to transfer while still being "real" enough to persist the resulting token. `exit(0)`
+immediately after, so phases/upload never run in this mode.
 
 `subprocess.CalledProcessError` and `FileNotFoundError` are both normalized into `MainCriticalError` in
 `run_onedrive_sync`, caught by `main()`'s existing exception handling — the upload call is only ever reached if
@@ -130,15 +149,12 @@ every prior step succeeded, so SharePoint is never mutated on a failed run.
 
 **What's still only in `service/onedrive/conf/config`, with no CLI equivalent at all** (confirmed against the
 client's own docs, not assumed): `drive_id`, `sync_dir_permissions`, `sync_file_permissions`. `drive_id` especially
-is why this file can't be eliminated outright — there's no `--drive-id` flag. (`sync_dir` is still physically present
-in the file but is dead weight — `--syncdir` on every call overrides it regardless of what's written there.) Moving
-`drive_id` to be generated at runtime from Vault (`SecretNames.DRIVE_ID`, already mapped in `vault.py`'s
-`_SECRET_MAP`) rather than hand-maintained in a git-tracked file is a discussed-but-not-yet-implemented direction —
-don't assume it's done.
-
-`--onedrive-logs-folder` (`arguments.py`) is parsed into `args` but **never actually passed to `onedrive`** — there
-is no CLI equivalent for `log_dir` at all, so this argument currently can't do what its name implies. Treat it as
-dead until/unless that's resolved differently.
+is why this file can't be eliminated outright — there's no `--drive-id` flag, though `onedrive --get-sharepoint-
+drive-id` can *look one up* without a sync (a one-off Graph query, not a config substitute). (`sync_dir` is still
+physically present in the file but is dead weight — `--syncdir` on every call overrides it regardless of what's
+written there.) Moving `drive_id` to be generated at runtime from Vault (`SecretNames.DRIVE_ID`, already mapped in
+`vault.py`'s `_SECRET_MAP`) rather than hand-maintained in a git-tracked file is a discussed-but-not-yet-implemented
+direction — don't assume it's done.
 
 The deeper design rationale and decision log for this architecture live in the `docs` git submodule
 (`ICIQ-DMP/justifactu-docs`, `docs/explanation/onedrive_sync_and_orchestration.md`) — but several decisions there
@@ -171,8 +187,8 @@ applies to this architecture. Don't treat this file as a finished, production-re
 
 - `arguments.py` → `defines.py`: CLI flags validate against enums defined in `defines.py` (`Phase`, `InputLocation`)
   via small `parse_*` functions, each raising a specific `custom_except.py` exception on invalid input.
-  `parse_directory` (distinct from `parse_input_location`) auto-creates a missing directory rather than erroring,
-  used by every OneDrive-path argument.
+  `parse_directory` (distinct from the now-orphaned `parse_input_location`) auto-creates a missing directory rather
+  than erroring, used by every OneDrive-path argument.
 - `onedrive_sync.py`: `_base_onedrive_args` builds the flags common to every invocation (`--confdir`,
   `--single-directory`, `--syncdir`, `--verbose`); `run_onedrive_sync` adds `--sync`/`--{direction}-only` plus the
   conditional flags on top. There is no separate "auth-only" function anymore — see the `--auth` bootstrap above.

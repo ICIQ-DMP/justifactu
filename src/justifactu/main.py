@@ -14,7 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from justifactu.onedrive_sync import run_onedrive_sync, run_onedrive_auth
+from justifactu.onedrive_sync import (
+    run_onedrive_sync,
+    run_onedrive_auth,
+    erase_drive_id,
+)
 from justifactu.arguments import process_parse_arguments
 from justifactu.defines import (
     NOW,
@@ -100,3 +104,8 @@ def main() -> None:
             )
         except Exception as e:
             log.error(f"Failed to send QA report email: {e}")
+
+        try:
+            erase_drive_id(confdir)
+        except Exception as e:
+            log.error(f"Failed to erase drive_id from onedrive config: {e}")

@@ -19,8 +19,39 @@ from pathlib import Path
 
 from .custom_except import MainCriticalError
 from .logger import get_logger
+from .defines import SecretNames
+from .secret import read_secret
 
 log = get_logger(__name__)
+
+
+def _set_drive_id(confdir: Path, drive_id: str) -> None:
+    """Rewrites the drive_id line in the onedrive config file."""
+    config_path = confdir / "config"
+    lines = config_path.read_text().splitlines()
+    new_lines = []
+    found = False
+    for line in lines:
+        if line.strip().startswith("drive_id"):
+            new_lines.append(f'drive_id = "{drive_id}"')
+            found = True
+        else:
+            new_lines.append(line)
+    if not found:
+        new_lines.append(f'drive_id = "{drive_id}"')
+    config_path.write_text("\n".join(new_lines) + "\n")
+
+
+def _write_drive_id(confdir: Path) -> None:
+    """Writes the drive_id secret into the onedrive config file at launch,
+    so the real value is never permanently stored in the git-tracked file."""
+    _set_drive_id(confdir, read_secret(SecretNames.DRIVE_ID.value))
+
+
+def erase_drive_id(confdir: Path) -> None:
+    """Blanks the drive_id line in the onedrive config file, so the real
+    value does not sit on disk between runs."""
+    _set_drive_id(confdir, "")
 
 
 def _base_onedrive_args(
@@ -49,6 +80,7 @@ def run_onedrive_sync(
     """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits."""
     log.info(f"Starting onedrive {direction} sync...")
     try:
+        _write_drive_id(confdir)
 
         args_list = _base_onedrive_args(confdir, single_dir, data_folder)
         args_list += ["--sync", f"--{direction}-only"]
@@ -76,6 +108,8 @@ def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
     """
     log.info("Starting onedrive authentication...")
     try:
+        _write_drive_id(confdir)
+
         args_list = [
             "onedrive",
             "--confdir",

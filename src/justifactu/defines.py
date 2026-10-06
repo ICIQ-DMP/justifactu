@@ -62,10 +62,6 @@ _SHAREPOINT_OUTPUT_PATH = _SHAREPOINT_INPUT_PATH / FolderName.OUTPUT.value
 class FolderPaths(Enum):
     """Composed folder paths, built from FolderName segments."""
 
-    SHAREPOINT_INPUT_PATH = _SHAREPOINT_INPUT_PATH
-    SHAREPOINT_OUTPUT_PATH = _SHAREPOINT_OUTPUT_PATH
-    SHAREPOINT_BILLS_PATH = _SHAREPOINT_INPUT_PATH / FolderName.BILLS_INPUT.value
-    SHAREPOINT_PAYMENTS_PATH = _SHAREPOINT_INPUT_PATH / FolderName.PAYMENTS_INPUT.value
     SHAREPOINT_SYNC_FOLDER = (
         Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
     )

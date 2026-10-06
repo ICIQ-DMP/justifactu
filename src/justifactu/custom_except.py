@@ -37,13 +37,5 @@ class MainCriticalError(Exception):
     """Raised when critical error occurs on main procedure."""
 
 
-class SkippedPdfRenamingInvalidSapId(Exception):
-    """Raised when pdf is skipped in name change due to invalid SAP id value."""
-
-
-class UnexpectedRenamingError(Exception):
-    """Raised when renaming failed due to unexpected circumstances."""
-
-
 class VaultSecretEmpty(Exception):
     """Raised when secret is empty."""

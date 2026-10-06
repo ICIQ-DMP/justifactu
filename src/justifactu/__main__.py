@@ -22,6 +22,6 @@ if __name__ == "__main__":
     args = process_parse_arguments()
 
     if args.phase is not None:
-        run_phase(args.phase, args.input_location)
+        run_phase(args.phase, args.runtime_location)
     else:
         main()

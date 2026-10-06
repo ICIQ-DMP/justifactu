@@ -110,14 +110,6 @@ def parse_arguments() -> argparse.Namespace:
     )
 
     parser.add_argument(
-        "--onedrive-logs-folder",
-        type=parse_directory,
-        required=False,
-        default=ROOT_FOLDER / "service/onedrive/logs",
-        help="Location for all Onedrive logs on local.",
-    )
-
-    parser.add_argument(
         "--sharepoint-sync-folder",
         type=parse_directory,
         required=False,
@@ -130,15 +122,6 @@ def parse_arguments() -> argparse.Namespace:
         type=parse_directory,
         required=False,
         default=None,
-    )
-
-    parser.add_argument(
-        "--download-input",
-        action="store_true",
-        default=False,
-        help="Force a fresh download of the input folder from SharePoint before processing, "
-        "as a fallback if OneDrive-for-Linux sync has failed or fallen behind. "
-        "Only meaningful with --location sharepoint.",
     )
 
     parser.add_argument(

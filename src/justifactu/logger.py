@@ -184,39 +184,9 @@ def setup_logging(
     )
 
 
-def obfuscate_text(text: str | None) -> str:
-    if text is None:
-        return str(text)
-    else:
-        return "*****"
-
-
 def get_logger(name: str) -> ExtendedLogger:
     """Return a logger with trace() method available."""
     return cast(ExtendedLogger, logging.getLogger(name))
-
-
-def process_log_flags(
-    very_verbose: bool, verbose: bool, quiet: bool, very_quiet: bool
-) -> tuple[LogLevel | None, bool]:
-    more_than_one_flag = False
-    flag_counter = 0
-    for flag in (very_verbose, verbose, quiet, very_quiet):
-        if flag:
-            flag_counter += 1
-    if flag_counter > 1:
-        more_than_one_flag = True
-
-    if very_verbose:
-        return LogLevel.TRACE, more_than_one_flag
-    elif verbose:
-        return LogLevel.DEBUG, more_than_one_flag
-    elif quiet:
-        return LogLevel.WARNING, more_than_one_flag
-    elif very_quiet:
-        return LogLevel.QUIET, more_than_one_flag
-    else:
-        return None, more_than_one_flag
 
 
 def configure_logging_from_settings(

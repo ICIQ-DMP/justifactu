@@ -26,7 +26,7 @@ log = get_logger(__name__)
 def _base_onedrive_args(
     confdir: Path, single_dir: Path, data_folder: Path
 ) -> list[str]:
-    """Flags shared by every onedrive invocation, sync or auth-only."""
+    """Flags shared by every sync invocation (download/upload)."""
     return [
         "onedrive",
         "--confdir",
@@ -62,6 +62,33 @@ def run_onedrive_sync(
     except subprocess.CalledProcessError as e:
         raise MainCriticalError(
             f"OneDrive {direction} sync failed with code {e.returncode}."
+        ) from e
+    except FileNotFoundError as e:
+        raise MainCriticalError("onedrive binary not found on PATH") from e
+
+
+def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
+    """Runs a one-shot OneDrive-for-Linux authentication pass.
+
+    No --single-directory, no --sync/--monitor: on a confdir with no
+    existing refresh token this drives the interactive OAuth flow,
+    persists the token, and exits — no file listing or transfer happens.
+    """
+    log.info("Starting onedrive authentication...")
+    try:
+        args_list = [
+            "onedrive",
+            "--confdir",
+            str(confdir),
+            "--syncdir",
+            str(data_folder),
+            "--verbose",
+        ]
+        subprocess.run(args_list, check=True)
+        log.info("OneDrive authentication complete.")
+    except subprocess.CalledProcessError as e:
+        raise MainCriticalError(
+            f"OneDrive authentication failed with code {e.returncode}."
         ) from e
     except FileNotFoundError as e:
         raise MainCriticalError("onedrive binary not found on PATH") from e

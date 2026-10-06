@@ -50,7 +50,6 @@ class FolderName(StrEnum):
     SHAREPOINT_ROOT = "justifactu"
     RUNTIME = "runtime"
     OUTPUT = "_output"
-    AUTH_SYNC = "_auth_sync"
 
 
 _SHAREPOINT_INPUT_PATH = (
@@ -64,9 +63,6 @@ class FolderPaths(Enum):
 
     SHAREPOINT_SYNC_FOLDER = (
         Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
-    )
-    SHAREPOINT_AUTH_PATH = (
-        Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.AUTH_SYNC.value
     )
 
 

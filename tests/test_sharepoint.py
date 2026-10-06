@@ -21,7 +21,6 @@ import requests
 
 from justifactu.sharepoint import (
     #    _connect_sharepoint,
-    get_list_id,
     get_site_id,
     get_drive_id,
     list_folder_contents,
@@ -49,29 +48,6 @@ def _ok_response(json_data: dict) -> MagicMock:
     resp.json.return_value = json_data
     resp.raise_for_status.return_value = None
     return resp
-
-
-# ── get_list_id ───────────────────────────────────────────────────────────────
-
-
-def test_get_list_id_returns_id_happy():
-    tm = _mock_token_manager()
-    resp = _ok_response({"id": "list-guid-123"})
-    with patch("justifactu.sharepoint.requests.get", return_value=resp) as mock_get:
-        list_id_result = get_list_id(tm, "site-id", "MyList")
-    assert list_id_result == "list-guid-123"
-    url = mock_get.call_args[0][0]
-    assert "site-id" in url
-    assert "MyList" in url
-
-
-def test_get_list_id_raises_http_error():
-    tm = _mock_token_manager()
-    resp = MagicMock()
-    resp.raise_for_status.side_effect = requests.exceptions.HTTPError("404")
-    with patch("justifactu.sharepoint.requests.get", return_value=resp):
-        with pytest.raises(requests.exceptions.HTTPError):
-            get_list_id(tm, "site-id", "MissingList")
 
 
 # ── get_site_id ───────────────────────────────────────────────────────────────

@@ -51,7 +51,7 @@ def main() -> None:
     log.info("Starting...")
 
     try:
-        if args.auth is not None and args.location == InputLocation.SHAREPOINT:
+        if args.auth and args.location == InputLocation.SHAREPOINT:
             run_onedrive_sync(
                 confdir,
                 direction=SyncDirection.DOWNLOAD.value,

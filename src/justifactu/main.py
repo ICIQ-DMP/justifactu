@@ -88,6 +88,7 @@ def main() -> None:
 
     except MainCriticalError as e:
         log.critical(e)
+        exit(1)
 
     finally:
         try:

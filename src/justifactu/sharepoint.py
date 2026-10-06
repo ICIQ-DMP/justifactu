@@ -30,28 +30,7 @@ from .token_manager import TokenManager, get_token_manager
 from .logger import get_logger
 from .secret import read_secret
 
-# Type alias for a Microsoft Graph / SharePoint JSON field value
-SharepointListFieldType = str | int | bool | None
-
 log = get_logger(__name__)
-
-
-def get_list_id(token_manager: TokenManager, site_id: str, list_name: str) -> str:
-    """Return the GUID of the named SharePoint list.
-
-    Args:
-        token_manager: Authenticated token manager.
-        site_id: SharePoint site identifier.
-        list_name: Display name of the target list.
-
-    Returns:
-        The list's Graph API GUID string.
-    """
-    url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/lists/{list_name}"
-    headers = {"Authorization": f"Bearer {token_manager.get_token()}"}
-    response = requests.get(url, headers=headers)
-    response.raise_for_status()
-    return cast(str, response.json()["id"])
 
 
 def get_site_id(token_manager: TokenManager, domain: str, site_name: str) -> str:

@@ -49,6 +49,7 @@ def run_onedrive_sync(
     """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits."""
     log.info(f"Starting onedrive {direction} sync...")
     try:
+
         args_list = _base_onedrive_args(confdir, single_dir, data_folder)
         args_list += ["--sync", f"--{direction}-only"]
         if direction == "download":

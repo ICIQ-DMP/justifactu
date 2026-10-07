@@ -181,16 +181,25 @@ design was describing behavior the code didn't have. The upload call is still on
 (including a successful fallback, if the primary download failed) succeeded, so SharePoint is never mutated on a
 failed run.
 
-**`drive_id` is no longer permanently stored in the git-tracked config file** (commit `1a1fded`).
-`service/onedrive/conf/config` now has `drive_id = ""` as a placeholder. `onedrive_sync.py::_write_drive_id`
-resolves the real value via `read_secret(SecretNames.DRIVE_ID.value)` (already mapped in `vault.py`'s `_SECRET_MAP`
-— no changes needed there) and rewrites the `drive_id` line in the config file immediately before every
-`run_onedrive_sync`/`run_onedrive_auth` call. `erase_drive_id` blanks it back to `""` again — called once, from
-`main()`'s `finally` block, so it runs regardless of success, failure, or the `--auth` early `exit(0)` path. Both
-functions share one line-rewrite helper, `_set_drive_id(confdir, value)`. Note the exposure window: the real value
-sits on disk for the *entire process run* (download → phases → upload), not just while `onedrive` itself needs it —
-a tighter alternative (write/erase around each individual `onedrive` subprocess call instead) was considered but
-not implemented.
+**`drive_id` is no longer permanently stored in the git-tracked config file** (commit `1a1fded`, revised in
+`fe369cb`/`8ec9257`). `service/onedrive/conf/config` now has `drive_id = ""` as a placeholder.
+`onedrive_sync.py::_write_drive_id` resolves the real value via `read_secret(SecretNames.DRIVE_ID.value)` (already
+mapped in `vault.py`'s `_SECRET_MAP`) and rewrites the `drive_id` line in the config file. `erase_drive_id` blanks
+it back to `""`. Both share one line-rewrite helper, `_set_drive_id(confdir, value)`. The write/erase happens
+per-call, wrapping each individual `onedrive` subprocess invocation (not once per whole process) — `main()`'s own
+`finally` block no longer calls `erase_drive_id` at all; that responsibility moved entirely into `onedrive_sync.py`.
+
+**As of commit `4cc2c62`, the erase is correctly guaranteed on every exit path.** `erase_drive_id(confdir)` is now
+called from a `finally` on the outer `try` in both `run_onedrive_sync` and `run_onedrive_auth`, so it runs whether
+the call succeeds, raises `CalledProcessError`/`FileNotFoundError` (both normalized into `MainCriticalError`), or
+hits something unexpected. (An earlier version of this — committed in `8ec9257` — called `erase_drive_id` as plain
+sequential code *after* a successful `subprocess.run`, which meant a failed sync skipped the erase entirely and
+left the real secret sitting in the git-tracked file with nothing left to clean it up, since the top-level backstop
+in `main()` was already gone. That's fixed now; don't reintroduce the sequential-call version.)
+
+`_base_onedrive_args`'s docstring (`"""Flags shared by every sync invocation (download/upload)."""`) is still
+slightly stale — `run_onedrive_auth` uses it too (see the module-layout note below), so it's shared by every
+invocation, not just sync. Minor, cosmetic, not yet fixed.
 
 **What's still only in `service/onedrive/conf/config`, with no CLI equivalent at all** (confirmed against the
 client's own docs): `sync_dir_permissions`, `sync_file_permissions`. (`sync_dir` is still physically present in the
@@ -232,10 +241,12 @@ applies to this architecture. Don't treat this file as a finished, production-re
   via small `parse_*` functions, each raising a specific `custom_except.py` exception on invalid input.
   `parse_directory` (distinct from the now-orphaned `parse_input_location`) auto-creates a missing directory rather
   than erroring, used by every OneDrive-path argument.
-- `onedrive_sync.py`: `_base_onedrive_args` builds the flags common to **sync** invocations only (`--confdir`,
-  `--single-directory`, `--syncdir`, `--verbose`); `run_onedrive_sync` adds `--sync`/`--{direction}-only` plus the
-  conditional flags on top. `run_onedrive_auth` is separate and does **not** use `_base_onedrive_args`.
-  `_write_drive_id`/`erase_drive_id` (both via `_set_drive_id`) handle the `drive_id` secret injection — see above.
+- `onedrive_sync.py`: `_base_onedrive_args(confdir, data_folder)` builds the flags common to **every** invocation
+  (`--confdir`, `--syncdir`, `--verbose`) — as of commit `8ec9257`, `single_dir`/`--single-directory` moved *out* of
+  it and into `run_onedrive_sync` itself (the only caller that needs it), and `run_onedrive_auth` was switched to
+  use the shared helper too, removing what used to be a duplicated inline arg list between the two functions.
+  `_write_drive_id`/`erase_drive_id` (both via `_set_drive_id`) handle the `drive_id` secret injection per call,
+  with the erase now correctly guaranteed via `finally` as of `4cc2c62` — see above.
 - `sharepoint.py`: Graph API fallback for the OneDrive download step only — see "SharePoint/Graph API code" above.
   Not used for upload under any circumstance; `onedrive --upload-only` remains the only upload path.
 - `logger.py`: a `extra={"qa_report": True}` tag on any `log.*()` call routes that line into a separate QA report

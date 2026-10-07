@@ -100,7 +100,7 @@ def parse_arguments() -> argparse.Namespace:
         "--onedrive-data-folder",
         type=parse_directory,
         required=False,
-        default=ONEDRIVE_DATA_FOLDER,
+        default=Path(os.environ.get("OD_DATA", str(ONEDRIVE_DATA_FOLDER))),
         help="Location for all Onedrive data on local.",
     )
 

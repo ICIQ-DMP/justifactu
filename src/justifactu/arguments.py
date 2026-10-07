@@ -16,6 +16,7 @@
 
 import argparse
 import sys
+import os
 from pathlib import Path
 
 from justifactu.custom_except import ArgumentInputLocationError
@@ -107,7 +108,9 @@ def parse_arguments() -> argparse.Namespace:
         "--onedrive-conf-folder",
         type=parse_directory,
         required=False,
-        default=ROOT_FOLDER / "service/onedrive/conf",
+        default=Path(
+            os.environ.get("OD_CONF", str(ROOT_FOLDER / "service/onedrive/conf"))
+        ),
         help="Location for all Onedrive configuration on local.",
     )
 

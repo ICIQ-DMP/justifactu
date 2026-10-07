@@ -24,6 +24,7 @@ pipeline {
 
     environment {
         OD_CONF = '/onedrive/conf'               // the persistent conf volume mount (config, refresh_token, items.sqlite3)
+        OD_DATA = '/onedrive/data'
     }
 
     stages {
@@ -35,7 +36,7 @@ pipeline {
                 sh '''
                     set -eu
                     make install
-                    make run CMD="--dry-run"  # TODO: remove when we enter into production
+                    make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder ${OD_DATA} --dry-run"  # TODO: remove when we enter into production
                 '''
             }
         }

@@ -135,14 +135,33 @@ above), once with `direction=SyncDirection.UPLOAD.value` after it (no fallback).
 `onedrive --monitor` (the long-running mode `compose.yml`'s sidecar still uses for local dev only).
 
 **Every path OneDrive touches is now a CLI argument, not a hardcoded Docker path:**
-- `confdir` = `args.onedrive_conf_folder` (default: `ROOT_FOLDER/service/onedrive/conf`)
-- sync root = `args.onedrive_data_folder`, passed as `--syncdir` (overrides the `config` file's own `sync_dir`)
+- `confdir` = `args.onedrive_conf_folder`, sync root = `args.onedrive_data_folder`, passed as `--syncdir` (overrides
+  the `config` file's own `sync_dir`). **As of commits `3e51de9`/`e358ef4`, both defaults resolve through an
+  environment variable before falling back to a repo-relative path:**
+  `Path(os.environ.get("OD_CONF", str(ROOT_FOLDER / "service/onedrive/conf")))` and the equivalent `OD_DATA` /
+  `ONEDRIVE_DATA_FOLDER` pair. This fixes a real bug: `ROOT_FOLDER` is computed from the source file's own location
+  at import time, so the old plain default pointed *inside whatever checkout happens to be running* — in the
+  Jenkins agent, that's the ephemeral workspace `checkout scm` wipes and recreates every build, not the persistent
+  `/onedrive/conf`/`/onedrive/data` Docker volumes `service/agent/compose.yml` actually mounts. A one-time `--auth`
+  token written to the old default would never survive to the next build.
 - sync scope = `args.sharepoint_sync_folder`, passed as `--single-directory` — this is the *only* scope filter;
   there is no `sync_list` file anymore (deliberately deleted — it conflicted with `--single-directory` and caused a
   real local-data-loss incident when both were active at once)
 - `args.runtime_location` (computed: `onedrive_data_folder / sharepoint_sync_folder`, auto-created via
   `parse_directory` if missing) is what `run_all_phases` actually processes — `_output`/`QA_ERRORS` now nest
   *inside* it, specifically so the upload pass can actually reach the merged-output/QA artifacts.
+
+**Why the fix lives at three layers, not just one:** `service/agent/dockerfile/Dockerfile` now sets
+`ENV OD_CONF=/onedrive/conf` and `ENV OD_DATA=/onedrive/data` at the *image* level — so any process started in that
+container inherits the right paths automatically, with no CLI flag needed, whether that's the Jenkinsfile's
+automated run or a human manually running `--auth` in a shell inside the container. `arguments.py` reading those
+env vars is what makes that inheritance actually work. The Jenkinsfile *also* passes
+`--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder ${OD_DATA}` explicitly on its `make run` line — redundant
+given the container-level env vars, but harmless, since it resolves to the same value either way. The important
+part is the container-level `ENV`: without it, only the Jenkinsfile's own automated invocation would get the right
+path, while a manually-run `--auth` bootstrap (which the Jenkinsfile never invokes — it's a human, one-time action)
+would still silently fall back to the wrong, ephemeral default unless someone remembered to type the override by
+hand. With it, both invocations are structurally guaranteed to agree, not just by coincidence of matching defaults.
 
 `--cleanup-local-files` is appended only on the download call, and `--dry-run` only when `args.dry_run` is set.
 **`--dry-run` only gates the OneDrive sync call itself** — it does not skip `run_all_phases()` afterward, so running
@@ -229,11 +248,14 @@ Jenkins has actually been given its own stack — doing so prematurely points at
 breaks the agent's startup.
 
 `Jenkinsfile` (repo root) is explicitly marked **draft, not wired into any real Jenkins job** — currently a
-single-stage pipeline (`make install && make run CMD="--dry-run"`, with a TODO to drop `--dry-run` once ready for
-real production runs), no `checkout scm` stage, no cron trigger, no build timeout. The `OD_CONF` environment
-variable it still declares is dead (same reason as above — `confdir` comes from a CLI arg now, not an env var) and
-the `aborted` post-block's message still references a 20h-timeout/multi-night-convergence story that no longer
-applies to this architecture. Don't treat this file as a finished, production-ready pipeline.
+single-stage pipeline (`make install && make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder
+${OD_DATA} --dry-run"`, with a TODO to drop `--dry-run` once ready for real production runs), no `checkout scm`
+stage, no cron trigger, no build timeout. **`OD_CONF`/`OD_DATA` are no longer dead** — as of `3e51de9`/`e358ef4`
+they're both real, live-read environment variables (set at the container level in
+`service/agent/dockerfile/Dockerfile`, consumed by `arguments.py`'s CLI-arg defaults) — this reverses what an
+earlier version of this document said about `OD_CONF` being a vestigial, unused declaration. The `aborted`
+post-block's message still references a 20h-timeout/multi-night-convergence story that no longer applies to this
+architecture. Don't treat this file as a finished, production-ready pipeline.
 
 ### Module layout (only the non-obvious relationships)
 

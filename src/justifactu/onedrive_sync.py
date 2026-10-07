@@ -92,17 +92,17 @@ def run_onedrive_sync(
 
         subprocess.run(args_list, check=True)
         log.info(f"OneDrive {direction} sync complete.")
-        try:
-            erase_drive_id(confdir)
-        except Exception as e:
-            log.error(f"Failed to erase drive_id from onedrive config: {e}")
-
     except subprocess.CalledProcessError as e:
         raise MainCriticalError(
             f"OneDrive {direction} sync failed with code {e.returncode}."
         ) from e
     except FileNotFoundError as e:
         raise MainCriticalError("onedrive binary not found on PATH") from e
+    finally:
+        try:
+            erase_drive_id(confdir)
+        except Exception as e:
+            log.error(f"Failed to erase drive_id from onedrive config: {e}")
 
 
 def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
@@ -120,14 +120,14 @@ def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
 
         subprocess.run(args_list, check=True)
         log.info("OneDrive authentication complete.")
-        try:
-            erase_drive_id(confdir)
-        except Exception as e:
-            log.error(f"Failed to erase drive_id from onedrive config: {e}")
-
     except subprocess.CalledProcessError as e:
         raise MainCriticalError(
             f"OneDrive authentication failed with code {e.returncode}."
         ) from e
     except FileNotFoundError as e:
         raise MainCriticalError("onedrive binary not found on PATH") from e
+    finally:
+        try:
+            erase_drive_id(confdir)
+        except Exception as e:
+            log.error(f"Failed to erase drive_id from onedrive config: {e}")

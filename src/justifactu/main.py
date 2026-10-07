@@ -38,6 +38,7 @@ from justifactu.mail import send_qa_report_mail
 from justifactu.process import run_all_phases
 from justifactu.custom_except import MainCriticalError
 from justifactu.secret import read_secret
+from justifactu.sharepoint import connect_sharepoint, download_input_folder
 
 log = get_logger(__name__)
 
@@ -61,13 +62,31 @@ def main() -> None:
             )
             exit(0)
 
-        run_onedrive_sync(
-            confdir,
-            direction=SyncDirection.DOWNLOAD.value,
-            single_dir=args.sharepoint_sync_folder,
-            data_folder=args.onedrive_data_folder,
-            dry_run=args.dry_run,
-        )
+        try:
+            run_onedrive_sync(
+                confdir,
+                direction=SyncDirection.DOWNLOAD.value,
+                single_dir=args.sharepoint_sync_folder,
+                data_folder=args.onedrive_data_folder,
+                dry_run=args.dry_run,
+            )
+        except MainCriticalError as e:
+            log.warning(
+                f"OneDrive download sync failed ({e}); falling back to a direct "
+                "Microsoft Graph download."
+            )
+            try:
+                token_manager, _, drive_id = connect_sharepoint()
+                download_input_folder(
+                    token_manager,
+                    drive_id,
+                    args.sharepoint_sync_folder,
+                    args.runtime_location,
+                )
+            except Exception as fallback_error:
+                raise MainCriticalError(
+                    f"Graph API fallback download also failed: {fallback_error}"
+                ) from fallback_error
 
         run_all_phases(args.runtime_location)
 

@@ -54,16 +54,12 @@ def erase_drive_id(confdir: Path) -> None:
     _set_drive_id(confdir, "")
 
 
-def _base_onedrive_args(
-    confdir: Path, single_dir: Path, data_folder: Path
-) -> list[str]:
+def _base_onedrive_args(confdir: Path, data_folder: Path) -> list[str]:
     """Flags shared by every sync invocation (download/upload)."""
     return [
         "onedrive",
         "--confdir",
         str(confdir),
-        "--single-directory",
-        str(single_dir),
         "--syncdir",
         str(data_folder),
         "--verbose",
@@ -82,8 +78,13 @@ def run_onedrive_sync(
     try:
         _write_drive_id(confdir)
 
-        args_list = _base_onedrive_args(confdir, single_dir, data_folder)
-        args_list += ["--sync", f"--{direction}-only"]
+        args_list = _base_onedrive_args(confdir, data_folder)
+        args_list += [
+            "--sync",
+            f"--{direction}-only",
+            "--single-directory",
+            str(single_dir),
+        ]
         if direction == "download":
             args_list.append("--cleanup-local-files")
         if dry_run:
@@ -115,14 +116,8 @@ def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
     try:
         _write_drive_id(confdir)
 
-        args_list = [
-            "onedrive",
-            "--confdir",
-            str(confdir),
-            "--syncdir",
-            str(data_folder),
-            "--verbose",
-        ]
+        args_list = _base_onedrive_args(confdir, data_folder)
+
         subprocess.run(args_list, check=True)
         log.info("OneDrive authentication complete.")
         try:

@@ -15,8 +15,9 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import pytest
+import sys
 
-from justifactu.arguments import parse_input_location, parse_input_type
+from justifactu.arguments import parse_input_location, parse_input_type, parse_arguments
 from justifactu.custom_except import ArgumentInputLocationError
 from justifactu.defines import InputLocation
 
@@ -55,3 +56,18 @@ def test_parse_input_location_file_raises(tmp_path):
     file_path.touch()
     with pytest.raises(ArgumentInputLocationError, match="not a directory"):
         parse_input_location(str(file_path))
+
+
+# ── --auth ────────────────────────────────────────────────────────────────────
+
+
+def test_auth_defaults_to_false_when_absent(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["prog"])
+    args = parse_arguments()
+    assert args.auth is False
+
+
+def test_auth_sets_true_with_no_value(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["prog", "--auth"])
+    args = parse_arguments()
+    assert args.auth is True

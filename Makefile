@@ -100,7 +100,8 @@ test: dev  ## Run tests
 CMD ?= --help
 run: install  ## Run the justifactu CLI (python -m justifactu)
 	@$(PYTHON) -m $(PKG_NAME) $(CMD)
-
+notify: install  ## Send a notification email (python -m justifactu.notify)
+	@$(PYTHON) -m $(PKG_NAME).notify $(CMD)
 
 # ---- docker ---------------------------------------------------------------
 

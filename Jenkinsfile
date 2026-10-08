@@ -43,24 +43,23 @@ pipeline {
     }
 
     post {
-        // D15 — notify once, here, rather than with try/catch around stages.
-        failure {
-            emailext(
-                to: 'dromero@iciq.es',
-                subject: "FAILED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: "Build failed or was aborted.\n\nConsole: ${env.BUILD_URL}console",
-                attachLog: true
-            )
-        }
-        aborted {
-            emailext(
-                to: 'dromero@iciq.es',
-                subject: "ABORTED: ${env.JOB_NAME} #${env.BUILD_NUMBER}",
-                body: "Build aborted (most likely the 20h timeout during the initial sync).\n" +
-                      "OneDrive saved its resume state; the next scheduled run continues.\n\n" +
-                      "Console: ${env.BUILD_URL}console",
-                attachLog: true
-            )
-        }
+    // D15 — notify once, here, rather than with try/catch around stages.
+    failure {
+        sh '''
+            set -eu
+make notify CMD="--subject 'FAILED: ${JOB_NAME} #${BUILD_NUMBER}' --body 'Build failed or was aborted.
+
+Console: ${BUILD_URL}console'"
+        '''
     }
+    aborted {
+        sh '''
+            set -eu
+            make notify CMD="--subject 'ABORTED: ${JOB_NAME} #${BUILD_NUMBER}' --body 'Build aborted (most likely the 20h timeout during the initial sync).
+OneDrive saved its resume state; the next scheduled run continues.
+
+Console: ${BUILD_URL}console'"
+        '''
+    }
+}
 }

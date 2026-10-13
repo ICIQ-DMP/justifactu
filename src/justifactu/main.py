@@ -98,6 +98,7 @@ def main() -> None:
             / FolderName.MERGED_OUTPUT.value
         )
         qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
+        qa_folder.mkdir(parents=True, exist_ok=True)
         copy_file(qa_report_path, qa_folder)
         regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
         copy_file(regular_log_path, qa_folder)

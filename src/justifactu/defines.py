@@ -47,6 +47,7 @@ class FolderName(StrEnum):
     PAYMENTS_INPUT = os.environ.get("PAYMENTS_INPUT_FOLDER", "Remeses_prova")
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
+    TEST_FOLDER = "carpeta_proves"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
     SHAREPOINT_ROOT = "justifactu"
     RUNTIME = "runtime"
@@ -56,6 +57,11 @@ class FolderName(StrEnum):
     ONEDRIVE_DATA = "data"
     ONEDRIVE_CONF = "conf"
 
+
+IS_TEST_RUN: bool = (
+    os.environ.get("BILLS_INPUT_FOLDER") is None
+    and os.environ.get("PAYMENTS_INPUT_FOLDER") is None
+)
 
 _SHAREPOINT_INPUT_PATH = (
     Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value

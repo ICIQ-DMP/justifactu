@@ -24,7 +24,7 @@ from .custom_except import (
     ParseSAPIdException,
 )
 
-from .defines import FolderName, FileSuffix, Phase
+from .defines import FolderName, FileSuffix, Phase, IS_TEST_RUN
 from .filesystem import list_dir, index_folder, change_file_name
 from .logger import get_logger
 from .payments import index_payments, rename_payments
@@ -122,8 +122,11 @@ def mock_phase3() -> None:
 
 
 def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
-    bills_folder = input_folder / FolderName.BILLS_INPUT.value
-    payments_folder = input_folder / FolderName.PAYMENTS_INPUT.value
+    test_root = (
+        input_folder / FolderName.TEST_FOLDER.value if IS_TEST_RUN else input_folder
+    )
+    bills_folder = test_root / FolderName.BILLS_INPUT.value
+    payments_folder = test_root / FolderName.PAYMENTS_INPUT.value
     bills_plus_payments_folder = (
         input_folder / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
     )

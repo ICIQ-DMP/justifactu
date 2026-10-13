@@ -15,16 +15,66 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import argparse
 from pathlib import Path
+from unittest.mock import patch
 
+import pytest
 
-from justifactu.defines import InputLocation
+from justifactu.defines import InputLocation, Phase
+from justifactu.main import main
 
 
 def _auth_args(tmp_path: Path) -> argparse.Namespace:
     return argparse.Namespace(
         auth=True,
+        phase=None,
         location=InputLocation.SHAREPOINT,
         onedrive_conf_folder=tmp_path / "conf",
         onedrive_data_folder=tmp_path / "data",
         dry_run=False,
     )
+
+
+def _phase_args(tmp_path: Path) -> argparse.Namespace:
+    return argparse.Namespace(
+        phase=Phase.PHASE_1,
+        runtime_location=tmp_path / "runtime",
+    )
+
+
+def test_auth_branch_calls_run_onedrive_auth_and_exits_before_phases(tmp_path):
+    args = _auth_args(tmp_path)
+
+    with (
+        patch("justifactu.main.process_parse_arguments", return_value=args),
+        patch("justifactu.main.configure_logging_from_settings"),
+        patch("justifactu.main.run_onedrive_auth") as mock_auth,
+        patch("justifactu.main.run_onedrive_sync") as mock_sync,
+        patch("justifactu.main.run_all_phases") as mock_phases,
+        patch("builtins.exit", side_effect=SystemExit(0)) as mock_exit,
+    ):
+        with pytest.raises(SystemExit):
+            main()
+
+    mock_auth.assert_called_once_with(
+        args.onedrive_conf_folder, data_folder=args.onedrive_data_folder
+    )
+    mock_exit.assert_called_once_with(0)
+    mock_sync.assert_not_called()
+    mock_phases.assert_not_called()
+
+
+def test_phase_flag_calls_run_phase_and_skips_main_pipeline(tmp_path):
+    args = _phase_args(tmp_path)
+
+    with (
+        patch("justifactu.main.process_parse_arguments", return_value=args),
+        patch("justifactu.main.configure_logging_from_settings"),
+        patch("justifactu.main.run_phase") as mock_run_phase,
+        patch("justifactu.main.run_onedrive_sync") as mock_sync,
+        patch("justifactu.main.run_all_phases") as mock_phases,
+    ):
+        main()
+
+    mock_run_phase.assert_called_once_with(args.phase, args.runtime_location)
+    mock_sync.assert_not_called()
+    mock_phases.assert_not_called()

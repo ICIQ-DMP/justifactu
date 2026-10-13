@@ -36,26 +36,37 @@ underscored form will not be recognized on the command line.
 
 ## Architecture
 
-### Two independent entry paths, not one
+### One entry path, not two
 
-`src/justifactu/__main__.py` is the actual program entry point (`python -m justifactu`) — `main.py`'s own
-`if __name__ == "__main__"` guard is dead code, since nothing runs `main.py` directly. `__main__.py` parses CLI
-args once and branches:
+`src/justifactu/__main__.py` is now just a thin wrapper with no logic of its own — `from justifactu.main import
+main` followed by `if __name__ == "__main__": main()`. As of commits `8b8d57d`/`69d4a89`, the CLI-arg parsing and
+the `--phase` branch that used to live in `__main__.py` were both moved directly into `main()` (`main.py`), so
+there is now a single parse and a single branch, both inside the one function:
 
-- `--phase` **absent** → `main()` (`main.py`) runs the full production pipeline: `run_all_phases()` (`process.py`),
-  bracketed by an OneDrive download/upload sync (see below).
-- `--phase` **present** (`1`, `2`, or `3` — see `Phase` enum in `defines.py`) → `run_phase()` (`process.py`) runs
-  *only* that one stage, via `process.py::_build_phase_map`'s dispatch dict. This path exists to test one stage in
-  isolation without touching the rest of the pipeline, and does **not** trigger an OneDrive sync.
+- `args = process_parse_arguments()` runs first, unconditionally.
+- `--phase` **present** (`1`, `2`, or `3` — see `Phase` enum in `defines.py`) → `run_phase(args.phase,
+  args.runtime_location)` runs via `process.py::_build_phase_map`'s dispatch dict, then `main()` returns
+  immediately. This path exists to test one stage in isolation without touching the rest of the pipeline — no
+  OneDrive sync, no `--auth` check.
+- `--phase` **absent** → execution falls through into the full production pipeline: the `--auth` bootstrap check,
+  the OneDrive download/upload sync (see below), and `run_all_phases()` (`process.py`).
 
-`run_phase()` and `run_all_phases()` share one dispatch table, so there's a single place defining what each phase
-does — `run_all_phases` loops `FULL_RUN_PHASES = (Phase.PHASE_1, Phase.PHASE_2)` against the same map `run_phase`
-looks a single key up in. Phase 3 (`mock_phase3`) is reachable via `--phase 3` for testing but deliberately excluded
-from `FULL_RUN_PHASES`, since it's a placeholder — don't add it to the full-run tuple until it's actually implemented.
+`run_phase()` and `run_all_phases()` still share one dispatch table, so there's a single place defining what each
+phase does — `run_all_phases` loops `FULL_RUN_PHASES = (Phase.PHASE_1, Phase.PHASE_2)` against the same map
+`run_phase` looks a single key up in. Phase 3 (`mock_phase3`) is reachable via `--phase 3` for testing but
+deliberately excluded from `FULL_RUN_PHASES`, since it's a placeholder — don't add it to the full-run tuple until
+it's actually implemented.
 
-`__main__.py` passes `args.runtime_location` (not `args.input_location`, which never existed as a CLI attribute)
-to `run_phase` — a prior mismatch between this call and what `arguments.py` actually produces was fixed in commit
-`aa7dd21`.
+`main()` passes `args.runtime_location` (not `args.input_location`, which never existed as a CLI attribute) to
+`run_phase` — a prior mismatch between this call and what `arguments.py` actually produces was fixed in commit
+`aa7dd21`; that call now lives in `main.py` rather than `__main__.py`, but the earlier fix still holds.
+
+**One consequence of the merge worth knowing:** the `--phase` branch's `return` happens before `main()`'s
+`try`/`finally` block, so taking it skips the QA-report email entirely — `send_qa_report_mail()` never runs for a
+`--phase`-only invocation. This was already true before the merge (`run_phase()` was called from `__main__.py`
+without `main()` ever being invoked at all), so behavior is unchanged, just less obvious now that both paths are
+nested inside the same function. `configure_logging_from_settings()` *does* still run either way, since it happens
+before the `args.phase` check — only the mail send is skipped, not logging setup.
 
 **A note on testing against a scoped folder:** `--sharepoint-sync-folder` uses `type=parse_directory`, which
 auto-creates the *local* target directory as part of argument parsing — before any sync runs, and regardless of

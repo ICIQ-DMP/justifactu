@@ -23,6 +23,7 @@ import requests
 import urllib3
 from pathlib import Path
 
+from .defaults import default_secrets_folder
 from .defines import SecretNames, ROOT_FOLDER
 from .logger import get_logger
 from .custom_except import VaultSecretEmpty
@@ -73,7 +74,7 @@ def _read_credential(name: str) -> str:
     Raises:
         KeyError: If the credential is not found in any source.
     """
-    for path in (Path("/run/secrets") / name, ROOT_FOLDER / "secrets" / name):
+    for path in (Path("/run/secrets") / name, default_secrets_folder() / name):
         if path.is_file():
             with open(path) as f:
                 value = f.read().strip()

@@ -19,13 +19,14 @@ from justifactu.onedrive_sync import (
     run_onedrive_auth,
 )
 from justifactu.arguments import process_parse_arguments
+
 from justifactu.defines import (
     NOW,
-    FolderName,
     SecretNames,
     SyncDirection,
     InputLocation,
 )
+from justifactu.paths import merged_output_folder, qa_errors_folder
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
@@ -49,7 +50,7 @@ def main() -> None:
 
     args = process_parse_arguments()
     if args.phase is not None:
-        run_phase(args.phase, args.runtime_location)
+        run_phase(args.phase, args.runtime_location, args.mode)
         return
 
     confdir = args.onedrive_conf_folder
@@ -90,14 +91,10 @@ def main() -> None:
                     f"Graph API fallback download also failed: {fallback_error}"
                 ) from fallback_error
 
-        run_all_phases(args.runtime_location)
+        run_all_phases(args.runtime_location, args.mode)
 
-        bills_plus_payments_folder = (
-            args.runtime_location
-            / FolderName.OUTPUT.value
-            / FolderName.MERGED_OUTPUT.value
-        )
-        qa_folder = bills_plus_payments_folder / FolderName.QA_ERRORS.value
+        bills_plus_payments_folder = merged_output_folder(args.runtime_location)
+        qa_folder = qa_errors_folder(bills_plus_payments_folder)
         qa_folder.mkdir(parents=True, exist_ok=True)
         copy_file(qa_report_path, qa_folder)
         regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")

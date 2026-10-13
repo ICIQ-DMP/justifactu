@@ -24,7 +24,14 @@ from .custom_except import (
     ParseSAPIdException,
 )
 
-from .defines import FolderName, FileSuffix, Phase, IS_TEST_RUN
+from .defines import FileSuffix, Phase, Mode
+from .paths import (
+    bills_folder,
+    payments_folder,
+    merged_output_folder,
+    qa_errors_folder,
+    year_merged_folder,
+)
 from .filesystem import list_dir, index_folder, change_file_name
 from .logger import get_logger
 from .payments import index_payments, rename_payments
@@ -48,7 +55,7 @@ def merge_bills_and_payments(
         **(freshly_renamed_payments or {}),
     }
     successful_payments: set[Path] = set()
-    qa_folder = merge_folder / FolderName.QA_ERRORS
+    qa_folder = qa_errors_folder(merge_folder)
     qa_folder.mkdir(parents=True, exist_ok=True)
 
     # Process bills and look for matches
@@ -75,8 +82,7 @@ def merge_bills_and_payments(
             log.error(f"No matching payment found for bill {bill_path}")
             continue
 
-        output_folder_name = sap.year + FolderName.YEAR_FOLDER_SUFFIX.value
-        output_folder_path = merge_folder / output_folder_name
+        output_folder_path = year_merged_folder(merge_folder, sap.year)
         output_folder_path.mkdir(parents=True, exist_ok=True)
 
         output_path = (
@@ -121,30 +127,26 @@ def mock_phase3() -> None:
     log.error("Mocking phase 3 successful! :D")
 
 
-def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
-    test_root = (
-        input_folder / FolderName.TEST_FOLDER.value if IS_TEST_RUN else input_folder
+def _phase_folders(input_folder: Path, mode: Mode) -> tuple[Path, Path, Path]:
+    return (
+        bills_folder(input_folder, mode),
+        payments_folder(input_folder, mode),
+        merged_output_folder(input_folder),
     )
-    bills_folder = test_root / FolderName.BILLS_INPUT.value
-    payments_folder = test_root / FolderName.PAYMENTS_INPUT.value
-    bills_plus_payments_folder = (
-        input_folder / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
-    )
-    return bills_folder, payments_folder, bills_plus_payments_folder
 
 
-def _build_phase_map(input_folder: Path) -> dict[Phase, Callable[[], None]]:
-    bills_folder, payments_folder, bills_plus_payments_folder = _phase_folders(
-        input_folder
+def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[], None]]:
+    bills_folder_path, payments_folder_path, bills_plus_payments_folder = (
+        _phase_folders(input_folder, mode)
     )
 
     def _run_phase_1() -> None:
-        rename_payments(payments_folder)
+        rename_payments(payments_folder_path)
 
     def _run_phase_2() -> None:
         merge_bills_and_payments(
-            bills_folder,
-            payments_folder,
+            bills_folder_path,
+            payments_folder_path,
             bills_plus_payments_folder,
             delete_processed=True,
         )
@@ -156,14 +158,14 @@ def _build_phase_map(input_folder: Path) -> dict[Phase, Callable[[], None]]:
     }
 
 
-def run_phase(phase: Phase, input_folder: Path) -> None:
-    _build_phase_map(input_folder)[phase]()
+def run_phase(phase: Phase, input_folder: Path, mode: Mode) -> None:
+    _build_phase_map(input_folder, mode)[phase]()
 
 
 FULL_RUN_PHASES: tuple[Phase, ...] = (Phase.PHASE_1, Phase.PHASE_2)
 
 
-def run_all_phases(input_folder: Path) -> None:
-    phase_map = _build_phase_map(input_folder)
+def run_all_phases(input_folder: Path, mode: Mode) -> None:
+    phase_map = _build_phase_map(input_folder, mode)
     for phase in FULL_RUN_PHASES:
         phase_map[phase]()

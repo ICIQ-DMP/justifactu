@@ -14,22 +14,30 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-"""CLI-flag fallback paths, composed from ROOT_FOLDER and FolderName segments."""
+"""Fallback Path values for CLI flags, computed from ROOT_FOLDER and FolderName segments."""
 
 from pathlib import Path
 
 from .defines import ROOT_FOLDER, FolderName
 
-ONEDRIVE_DATA_FOLDER: Path = (
-    ROOT_FOLDER
-    / FolderName.SERVICE.value
-    / FolderName.ONEDRIVE.value
-    / FolderName.ONEDRIVE_DATA.value
-)
 
-ONEDRIVE_CONF_FOLDER: Path = (
-    ROOT_FOLDER
-    / FolderName.SERVICE.value
-    / FolderName.ONEDRIVE.value
-    / FolderName.ONEDRIVE_CONF.value
-)
+def default_onedrive_data_folder() -> Path:
+    return (
+        ROOT_FOLDER
+        / FolderName.SERVICE.value
+        / FolderName.ONEDRIVE.value
+        / FolderName.ONEDRIVE_DATA.value
+    )
+
+
+def default_onedrive_conf_folder() -> Path:
+    return (
+        ROOT_FOLDER
+        / FolderName.SERVICE.value
+        / FolderName.ONEDRIVE.value
+        / FolderName.ONEDRIVE_CONF.value
+    )
+
+
+def default_secrets_folder() -> Path:
+    return ROOT_FOLDER / FolderName.SECRETS.value

@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 from pypdf import PdfWriter
+from justifactu.defines import FolderName
 
 # Add project root to PYTHONPATH dynamically
 ROOT_DIR = Path(__file__).resolve().parent.parent
@@ -45,9 +46,9 @@ def blank_pdf(tmp_path: Path) -> Path:
 @pytest.fixture
 def billing_dirs(tmp_path: Path) -> tuple[Path, Path, Path]:
     """Creates bills, payments, and output directories under tmp_path."""
-    bills_dir = tmp_path / "FACTURES"
-    payments_dir = tmp_path / "Remeses"
-    output_dir = tmp_path / "output"
+    bills_dir = tmp_path / FolderName.BILLS_INPUT_PROD.value
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
+    output_dir = tmp_path / FolderName.GENERAL_OUTPUT.value
     bills_dir.mkdir()
     payments_dir.mkdir()
     return bills_dir, payments_dir, output_dir

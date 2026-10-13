@@ -15,8 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
-import os
-from enum import StrEnum, Enum
+from enum import StrEnum
 from pathlib import Path
 
 ROOT_FOLDER: Path = Path(__file__).resolve().parent.parent.parent
@@ -40,41 +39,35 @@ class SyncDirection(StrEnum):
     UPLOAD = "upload"
 
 
+class Mode(StrEnum):
+    """Run mode: selects between production and test folder names."""
+
+    PROD = "prod"
+    TEST = "test"
+
+
 class FolderName(StrEnum):
     """Named folders used across the pipeline."""
 
-    BILLS_INPUT = os.environ.get("BILLS_INPUT_FOLDER", "FACTURES_prova")
-    PAYMENTS_INPUT = os.environ.get("PAYMENTS_INPUT_FOLDER", "Remeses_prova")
+    BILLS_INPUT_PROD = "FACTURES"
+    BILLS_INPUT_TEST = "FACTURES_prova"
+    PAYMENTS_INPUT_PROD = "Remeses"
+    PAYMENTS_INPUT_TEST = "Remeses_prova"
+    TEST_FOLDER = "carpeta_proves"
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
-    TEST_FOLDER = "carpeta_proves"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
     SHAREPOINT_ROOT = "justifactu"
     RUNTIME = "runtime"
     OUTPUT = "_output"
+    GENERAL_OUTPUT = "output"
+    ADMIN_LOGS = "_admin_logs"
     SERVICE = "service"
     ONEDRIVE = "onedrive"
     ONEDRIVE_DATA = "data"
     ONEDRIVE_CONF = "conf"
-
-
-IS_TEST_RUN: bool = (
-    os.environ.get("BILLS_INPUT_FOLDER") is None
-    and os.environ.get("PAYMENTS_INPUT_FOLDER") is None
-)
-
-_SHAREPOINT_INPUT_PATH = (
-    Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
-)
-_SHAREPOINT_OUTPUT_PATH = _SHAREPOINT_INPUT_PATH / FolderName.OUTPUT.value
-
-
-class FolderPaths(Enum):
-    """Composed folder paths, built from FolderName segments."""
-
-    SHAREPOINT_SYNC_FOLDER = (
-        Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
-    )
+    SECRETS = "secrets"
+    AUTH_SYNC = "_auth_sync"
 
 
 class Phase(StrEnum):

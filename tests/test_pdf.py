@@ -58,7 +58,7 @@ def test_extract_sap_number_strips_all_non_digits():
 
 
 def test_index_payments_maps_sap_to_path(tmp_path):
-    payments_dir = tmp_path / "Remeses"
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
     payments_dir.mkdir()
     pdf = payments_dir / f"{id_sap_instance}-P.pdf"
     create_blank_pdf(pdf)
@@ -70,7 +70,7 @@ def test_index_payments_maps_sap_to_path(tmp_path):
 
 
 def test_index_payments_skips_merged_files(tmp_path):
-    payments_dir = tmp_path / "Remeses"
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
     payments_dir.mkdir()
     merged = payments_dir / f"{pattern}-P_merged.pdf"
     create_blank_pdf(merged)
@@ -81,7 +81,7 @@ def test_index_payments_skips_merged_files(tmp_path):
 
 
 def test_index_payments_skips_invalid_sap_length(tmp_path):
-    payments_dir = tmp_path / "Remeses"
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
     payments_dir.mkdir()
     bad = payments_dir / "12345-P.pdf"  # only 5 digits
     create_blank_pdf(bad)
@@ -92,7 +92,7 @@ def test_index_payments_skips_invalid_sap_length(tmp_path):
 
 
 def test_index_payments_empty_folder(tmp_path):
-    payments_dir = tmp_path / "Remeses"
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
     payments_dir.mkdir()
 
     result = index_payments(index_folder(payments_dir))
@@ -165,7 +165,7 @@ def test_cleanup_processed_files_deletes_bill_when_requested(tmp_path):
 
 
 def test_rename_payments_renames_pdf(tmp_path):
-    payments_dir = tmp_path / "Remeses"
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
     payments_dir.mkdir()
     pdf = payments_dir / "some_payment_document.pdf"
     create_blank_pdf(pdf)
@@ -182,7 +182,7 @@ def test_rename_payments_renames_pdf(tmp_path):
 
 
 def test_rename_payments_skips_already_renamed(tmp_path):
-    payments_dir = tmp_path / "Remeses"
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
     payments_dir.mkdir()
     already_renamed = payments_dir / f"{id_sap_instance}-P.pdf"
     create_blank_pdf(already_renamed)
@@ -193,7 +193,7 @@ def test_rename_payments_skips_already_renamed(tmp_path):
 
 
 def test_rename_payments_skips_non_pdf(tmp_path):
-    payments_dir = tmp_path / "Remeses"
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
     payments_dir.mkdir()
     txt_file = payments_dir / "document.txt"
     txt_file.touch()

@@ -20,12 +20,12 @@ import os
 from pathlib import Path
 
 from justifactu.custom_except import ArgumentInputLocationError
-from justifactu.defines import (
-    InputLocation,
-    ROOT_FOLDER,
-    Phase,
-    FolderPaths,
+from justifactu.defines import InputLocation, Phase, Mode
+from justifactu.defaults import (
+    default_onedrive_data_folder,
+    default_onedrive_conf_folder,
 )
+from justifactu.paths import sharepoint_sync_folder
 
 
 def parse_input_type(value: str) -> InputLocation:
@@ -66,10 +66,18 @@ def parse_phase(value: str) -> Phase:
         )
 
 
+def parse_mode(value: str) -> Mode:
+    try:
+        return Mode(value)
+    except ValueError:
+        raise ArgumentInputLocationError(
+            'The mode supplied "' + value + '" is not defined.'
+        )
+
+
 def parse_arguments() -> argparse.Namespace:
     """Parse and validate command-line arguments"""
     parser = argparse.ArgumentParser(description="Justifactu")
-    ONEDRIVE_DATA_FOLDER = ROOT_FOLDER / "service/onedrive/data"
 
     parser.add_argument(
         "-l",
@@ -100,7 +108,7 @@ def parse_arguments() -> argparse.Namespace:
         "--onedrive-data-folder",
         type=parse_directory,
         required=False,
-        default=Path(os.environ.get("OD_DATA", str(ONEDRIVE_DATA_FOLDER))),
+        default=Path(os.environ.get("OD_DATA", str(default_onedrive_data_folder()))),
         help="Location for all Onedrive data on local.",
     )
 
@@ -108,9 +116,7 @@ def parse_arguments() -> argparse.Namespace:
         "--onedrive-conf-folder",
         type=parse_directory,
         required=False,
-        default=Path(
-            os.environ.get("OD_CONF", str(ROOT_FOLDER / "service/onedrive/conf"))
-        ),
+        default=Path(os.environ.get("OD_CONF", str(default_onedrive_conf_folder()))),
         help="Location for all Onedrive configuration on local.",
     )
 
@@ -118,7 +124,7 @@ def parse_arguments() -> argparse.Namespace:
         "--sharepoint-sync-folder",
         type=parse_directory,
         required=False,
-        default=FolderPaths.SHAREPOINT_SYNC_FOLDER.value,
+        default=sharepoint_sync_folder(),
         help="Location for all SharePoint synced data on local.",
     )
 
@@ -137,6 +143,14 @@ def parse_arguments() -> argparse.Namespace:
         default=None,
         help="Which phase to run. Possible values: "
         + ", ".join(p.value for p in Phase),
+    )
+
+    parser.add_argument(
+        "--mode",
+        type=parse_mode,
+        required=False,
+        default=Mode.TEST,
+        help="Run mode. Possible values: " + ", ".join(m.value for m in Mode),
     )
 
     args = parser.parse_args()

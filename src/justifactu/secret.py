@@ -19,8 +19,8 @@
 from pathlib import Path
 from typing import Callable
 
+from .defaults import default_secrets_folder
 from .custom_except import SecretCouldNotBeReadFromAnySourceError
-from .defines import ROOT_FOLDER
 from .filesystem import read_file_content, read_env_var
 from .logger import get_logger
 from .vault import read_vault_secret
@@ -39,7 +39,7 @@ def read_secret(secret_name: str) -> str:
     """
     sources: list[Callable[[], str]] = [
         lambda: read_file_content(Path("/run/secrets") / secret_name),
-        lambda: read_file_content(ROOT_FOLDER / "secrets" / secret_name),
+        lambda: read_file_content(default_secrets_folder() / secret_name),
         lambda: read_env_var(secret_name),
         lambda: read_vault_secret(secret_name),
     ]

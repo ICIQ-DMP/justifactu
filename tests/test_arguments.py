@@ -19,7 +19,7 @@ import sys
 
 from justifactu.arguments import parse_input_location, parse_input_type, parse_arguments
 from justifactu.custom_except import ArgumentInputLocationError
-from justifactu.defines import InputLocation
+from justifactu.defines import InputLocation, Mode
 
 # ── parse_input_type ─────────────────────────────────────────────────────────
 
@@ -71,3 +71,24 @@ def test_auth_sets_true_with_no_value(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["prog", "--auth"])
     args = parse_arguments()
     assert args.auth is True
+
+
+# ── --mode ────────────────────────────────────────────────────────────────────
+
+
+def test_mode_defaults_to_test_when_absent(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["prog"])
+    args = parse_arguments()
+    assert args.mode == Mode.TEST
+
+
+def test_mode_prod_explicit(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["prog", "--mode", "prod"])
+    args = parse_arguments()
+    assert args.mode == Mode.PROD
+
+
+def test_mode_test_explicit(monkeypatch):
+    monkeypatch.setattr(sys, "argv", ["prog", "--mode", "test"])
+    args = parse_arguments()
+    assert args.mode == Mode.TEST

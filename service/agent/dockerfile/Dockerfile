@@ -18,6 +18,8 @@ FROM jenkins/ssh-agent:latest
 
 ENV OD_CONF=/onedrive/conf
 ENV OD_DATA=/onedrive/data
+ENV BILLS_INPUT_FOLDER=FACTURES
+ENV PAYMENTS_INPUT_FOLDER=Remeses
 
 RUN apt-get update && \
     apt-get install -y python3 python3-pip python3-venv && \

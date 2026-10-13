@@ -19,14 +19,14 @@ from enum import Enum
 from pathlib import Path
 from typing import Optional, Any, cast
 from rich.logging import RichHandler
-from .defines import ROOT_FOLDER, NOW
+from .defines import ROOT_FOLDER, NOW, FolderName
 
 # ---- extend the logging module with TRACE
 DATE_FORMAT = "%d/%m/%Y"
 TRACE_LEVEL_NUM = 1
 logging.addLevelName(TRACE_LEVEL_NUM, "TRACE")
 MESSAGE_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
-GENERAL_OUTPUT_FOLDER: Path = ROOT_FOLDER / "output"
+GENERAL_OUTPUT_FOLDER: Path = ROOT_FOLDER / FolderName.OUTPUT.value
 ADMIN_LOG_FOLDER: Path = GENERAL_OUTPUT_FOLDER / "_admin_logs"
 
 

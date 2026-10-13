@@ -15,6 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
+import os
 from enum import StrEnum, Enum
 from pathlib import Path
 
@@ -42,14 +43,18 @@ class SyncDirection(StrEnum):
 class FolderName(StrEnum):
     """Named folders used across the pipeline."""
 
-    BILLS_INPUT = "FACTURES_prova"  # TODO: Remove when entering into production
-    PAYMENTS_INPUT = "Remeses_prova"
+    BILLS_INPUT = os.environ.get("BILLS_INPUT_FOLDER", "FACTURES_prova")
+    PAYMENTS_INPUT = os.environ.get("PAYMENTS_INPUT_FOLDER", "Remeses_prova")
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
     SHAREPOINT_ROOT = "justifactu"
     RUNTIME = "runtime"
     OUTPUT = "_output"
+    SERVICE = "service"
+    ONEDRIVE = "onedrive"
+    ONEDRIVE_DATA = "data"
+    ONEDRIVE_CONF = "conf"
 
 
 _SHAREPOINT_INPUT_PATH = (

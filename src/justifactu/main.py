@@ -34,7 +34,7 @@ from justifactu.logger import (
 )
 from justifactu.filesystem import copy_file
 from justifactu.mail import send_qa_report_mail
-from justifactu.process import run_all_phases
+from justifactu.process import run_all_phases, run_phase
 from justifactu.custom_except import MainCriticalError
 from justifactu.secret import read_secret
 from justifactu.sharepoint import connect_sharepoint, download_input_folder
@@ -48,6 +48,9 @@ def main() -> None:
     configure_logging_from_settings(qa_files_log_file=qa_report_path)
 
     args = process_parse_arguments()
+    if args.phase is not None:
+        run_phase(args.phase, args.runtime_location)
+        return
 
     confdir = args.onedrive_conf_folder
 

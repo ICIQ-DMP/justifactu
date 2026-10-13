@@ -14,14 +14,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from justifactu.arguments import process_parse_arguments
 from justifactu.main import main
-from justifactu.process import run_phase
 
 if __name__ == "__main__":
-    args = process_parse_arguments()
-
-    if args.phase is not None:
-        run_phase(args.phase, args.runtime_location)
-    else:
-        main()
+    main()

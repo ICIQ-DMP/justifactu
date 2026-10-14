@@ -1,3 +1,4 @@
+<a id="readme-top"></a>
 ## Goal
 [![Contributors][contributors-shield]][contributors-url]
 [![Forks][forks-shield]][forks-url]
@@ -6,7 +7,6 @@
 [![project_license][license-shield]][license-url]
 [![LinkedIn][linkedin-shield]][linkedin-url]
 
-<a id="readme-top"></a>
 <br />
 <div align="center">
 <a href="https://github.com/ICIQ-DMP/justifactu">

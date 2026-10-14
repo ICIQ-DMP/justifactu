@@ -12,6 +12,8 @@ All development commands are defined once in the `Makefile` and reused by pre-co
     make fmt                        # black src tests && ruff check --fix .
     make test                       # PYTHONPATH=src pytest -s -v   (testpaths = tests, per pyproject.toml)
     make run CMD="--phase 1"        # python -m justifactu <CMD>; CMD defaults to --help if omitted
+    make run CMD="--mode prod"      # same, but read from the production FACTURES/Remeses folders instead of test ones
+    make notify CMD="--subject '...' --body '...'"   # python -m justifactu.notify <CMD>; standalone one-off email
 
 Run a single test file or test function directly with pytest (bypassing the Makefile), same env var the `test`
 target uses:
@@ -45,11 +47,13 @@ there is now a single parse and a single branch, both inside the one function:
 
 - `args = process_parse_arguments()` runs first, unconditionally.
 - `--phase` **present** (`1`, `2`, or `3` — see `Phase` enum in `defines.py`) → `run_phase(args.phase,
-  args.runtime_location)` runs via `process.py::_build_phase_map`'s dispatch dict, then `main()` returns
+  args.runtime_location, args.mode)` runs via `process.py::_build_phase_map`'s dispatch dict, then `main()` returns
   immediately. This path exists to test one stage in isolation without touching the rest of the pipeline — no
-  OneDrive sync, no `--auth` check.
+  OneDrive sync, no `--auth` check. (`run_phase` gained the third `mode` argument in commit `64587cf` — see "Path
+  and folder-name composition" below.)
 - `--phase` **absent** → execution falls through into the full production pipeline: the `--auth` bootstrap check,
-  the OneDrive download/upload sync (see below), and `run_all_phases()` (`process.py`).
+  the OneDrive download/upload sync (see below), and `run_all_phases(args.runtime_location, args.mode)`
+  (`process.py`).
 
 `run_phase()` and `run_all_phases()` still share one dispatch table, so there's a single place defining what each
 phase does — `run_all_phases` loops `FULL_RUN_PHASES = (Phase.PHASE_1, Phase.PHASE_2)` against the same map
@@ -72,8 +76,81 @@ before the `args.phase` check — only the mail send is skipped, not logging set
 auto-creates the *local* target directory as part of argument parsing — before any sync runs, and regardless of
 whether that name means anything on the SharePoint side. A typo'd or wrong folder name here won't error at parse
 time; it silently creates an empty local directory, the sync then matches nothing remotely, and `run_all_phases`
-fails later with a `list_dir`/`ValueError` on a missing `FACTURES_prova`/`Remeses_prova` subfolder. If that error
-shows up, check the actual local folder contents and the real SharePoint path before assuming a code regression.
+fails later with a `list_dir`/`ValueError` on a missing bills/payments subfolder. **Which subfolder it's looking
+for depends on `--mode`** (default `test`): under `Mode.TEST` that's `carpeta_proves/FACTURES_prova`/
+`carpeta_proves/Remeses_prova`; under `Mode.PROD` it's `FACTURES`/`Remeses` directly, no `carpeta_proves` nesting.
+See "Path and folder-name composition" below. If that error shows up, check the actual local folder contents, the
+real SharePoint path, and which `--mode` you ran with before assuming a code regression.
+
+### Path and folder-name composition: `defines.py` / `paths.py` / `defaults.py`
+
+**As of commit `64587cf`, every hardcoded folder/file-name string literal was removed from the codebase outside
+`defines.py`'s own enums** — this replaced a long-standing pattern where the same few segments (`"FACTURES_prova"`,
+`"service/onedrive/data"`, `"output"`, `"secrets"`, etc.) were duplicated or composed inline across `arguments.py`,
+`process.py`, `main.py`, `logger.py`, `secret.py`, and `vault.py`. The split, by concern:
+
+- **`defines.py`** holds *only* bare-name `StrEnum` members now — no `Path(...)`, no `/` joins, no composed values
+  of any kind (besides `ROOT_FOLDER` itself and the `NOW`/`DATETIME_FORMAT` timestamp constants, which were never
+  in scope for this cleanup). The `FolderPaths` enum that used to live here — down to its one surviving member,
+  `SHAREPOINT_SYNC_FOLDER` — was **deleted entirely**, along with the already-dead `_SHAREPOINT_INPUT_PATH`/
+  `_SHAREPOINT_OUTPUT_PATH` module-level helpers. If you're looking for `FolderPaths`, it no longer exists; its one
+  real consumer moved into `paths.py::sharepoint_sync_folder()` (below).
+- **`paths.py`** (new file) composes real runtime `Path`s from an already-resolved base directory (and a `Mode`,
+  where relevant) plus `FolderName` segments: `bills_folder(input_folder, mode)`, `payments_folder(input_folder,
+  mode)`, `merged_output_folder(input_folder)`, `qa_errors_folder(merged_output_folder)`,
+  `year_merged_folder(merged_output_folder, year)`, `sharepoint_sync_folder()`, and `sharepoint_auth_folder()`.
+  This replaced hand-rolled, slightly-differently-written composition logic that used to be duplicated between
+  `process.py::_phase_folders` and `main.py`. **`sharepoint_auth_folder()` has no caller anywhere in the codebase**
+  — it's a best-effort reconstruction of the pre-`2ea3480` `justifactu/_auth_sync` constant, included for
+  completeness but currently unused; don't assume it's wired into the `--auth` flow just because it exists.
+- **`defaults.py`** computes the `ROOT_FOLDER`-relative fallback `Path` for CLI flags that need one —
+  `default_onedrive_data_folder()`, `default_onedrive_conf_folder()`, `default_secrets_folder()` — all built from
+  `FolderName` segments only. This file already existed before `64587cf` but was **dead code**: `arguments.py` had
+  its own separate inline `Path` literals and never imported from it. It's actually wired up now.
+
+**The bills/payments test/production switch moved from an env-var-resolved `FolderName` member to an explicit
+`Mode`/`--mode` CLI flag.** The interim version of this (commit `b6b4e7c`) read `BILLS_INPUT_FOLDER`/
+`PAYMENTS_INPUT_FOLDER` environment variables into a single `FolderName.BILLS_INPUT`/`PAYMENTS_INPUT` pair at
+import time, with a module-level `IS_TEST_RUN` bool derived from whether those env vars were set. **That whole
+mechanism is gone as of `64587cf`.** Current shape:
+
+- `FolderName` has two explicit pairs: `BILLS_INPUT_PROD = "FACTURES"` / `BILLS_INPUT_TEST = "FACTURES_prova"` and
+  `PAYMENTS_INPUT_PROD = "Remeses"` / `PAYMENTS_INPUT_TEST = "Remeses_prova"`.
+- A new `Mode(StrEnum)` — `PROD = "prod"` / `TEST = "test"` — selected by a `--mode` CLI flag (`arguments.py`,
+  `parse_mode`), default `Mode.TEST`.
+- `paths.py::bills_folder`/`payments_folder` pick the `*_PROD`/`*_TEST` member based on `mode`, and **only under
+  `Mode.TEST`** additionally nest one level deeper under `FolderName.TEST_FOLDER = "carpeta_proves"` — e.g.
+  `<runtime>/carpeta_proves/FACTURES_prova` vs. `<runtime>/FACTURES`. This `carpeta_proves` nesting mirrors how
+  real local test fixtures are actually laid out on disk; production mode never has it.
+- `process.py`'s `_phase_folders`/`_build_phase_map`/`run_phase`/`run_all_phases` all take `mode: Mode` now and
+  thread it down into the two `paths.py` calls; `main()` passes `args.mode` into both.
+
+**`service/agent/dockerfile/Dockerfile`'s `ENV BILLS_INPUT_FOLDER=FACTURES` / `ENV PAYMENTS_INPUT_FOLDER=Remeses`
+lines are leftovers from the interim `b6b4e7c` mechanism and are now dead** — nothing reads those env vars any
+more. Until a production Jenkins invocation explicitly adds `--mode prod` to its `make run` line, the job silently
+stays in `Mode.TEST` regardless of those `ENV` lines or anything else in the container.
+
+**`logger.py`'s `GENERAL_OUTPUT_FOLDER` got its own dedicated segment, fixing a real bug.** Between `69d4a89` and
+`64587cf`, `GENERAL_OUTPUT_FOLDER` was computed as `ROOT_FOLDER / FolderName.OUTPUT.value` — reusing `OUTPUT`
+(`"_output"`, the per-run merged-output subfolder nested under `args.runtime_location`) for an unrelated,
+top-level concept (the general log folder), which silently changed its actual value from `"output"` to
+`"_output"` and conflated two different things under one enum member. `defines.py` now has a separate
+`GENERAL_OUTPUT = "output"` member for this, plus `ADMIN_LOGS = "_admin_logs"` replacing the literal that used to
+be inline in `logger.py`.
+
+**`secret.py`/`vault.py`** both now call `default_secrets_folder()` instead of each separately inlining
+`ROOT_FOLDER / "secrets"` — `vault.py` still imports `ROOT_FOLDER` directly too, since it's also used for an
+unrelated `ca_cert_path` resolution further down in the same file.
+
+**Test fixture drift was fixed in the same commit.** `tests/conftest.py`'s `billing_dirs` fixture and all 7
+occurrences in `tests/test_pdf.py` previously hardcoded the literal strings `"FACTURES"`/`"Remeses"`/`"output"`
+directly rather than reading the enum — they happened to match `FolderName.BILLS_INPUT_PROD`/
+`PAYMENTS_INPUT_PROD`/`GENERAL_OUTPUT`'s values by coincidence, but would never have caught a future rename of
+those values, since the tests built their own fixture folders with the hardcoded names instead of reading the
+enum. Both now read `FolderName.BILLS_INPUT_PROD.value`/`PAYMENTS_INPUT_PROD.value`/`GENERAL_OUTPUT.value`
+directly. Two new test files were added alongside this: `tests/test_paths.py` (one test per `paths.py` function)
+and `tests/test_defaults.py` (one test per `defaults.py` function); `tests/test_arguments.py` gained cases for
+`--mode prod`/`--mode test`/the default.
 
 ### SAP ID is the correlation key between bills and payments
 
@@ -126,9 +203,8 @@ Two smaller known-dead leftovers, not yet removed: `arguments.py::parse_input_lo
 `parse_directory`'s auto-create behavior everywhere; only its own tests call it) and `filesystem.py::move_file`
 (tested in isolation, but no production code path calls it).
 
-`FolderPaths` (`defines.py`) has a single member — `SHAREPOINT_SYNC_FOLDER` — feeding the real CLI default consumed
-by every OneDrive sync call. `InputLocation` and the `-l/--location` CLI flag are in active use — `main.py`'s
-one-time `--auth` bootstrap is gated on `args.location == InputLocation.SHAREPOINT`.
+`InputLocation` and the `-l/--location` CLI flag are in active use — `main.py`'s one-time `--auth` bootstrap is
+gated on `args.location == InputLocation.SHAREPOINT`.
 
 `--download-input` and `--onedrive-logs-folder` (`arguments.py`) were both removed outright in commit `aa7dd21` —
 the former was parsed but never read by any code path; the latter was parsed but never passed to the `onedrive`
@@ -149,18 +225,21 @@ above), once with `direction=SyncDirection.UPLOAD.value` after it (no fallback).
 - `confdir` = `args.onedrive_conf_folder`, sync root = `args.onedrive_data_folder`, passed as `--syncdir` (overrides
   the `config` file's own `sync_dir`). **As of commits `3e51de9`/`e358ef4`, both defaults resolve through an
   environment variable before falling back to a repo-relative path:**
-  `Path(os.environ.get("OD_CONF", str(ROOT_FOLDER / "service/onedrive/conf")))` and the equivalent `OD_DATA` /
-  `ONEDRIVE_DATA_FOLDER` pair. This fixes a real bug: `ROOT_FOLDER` is computed from the source file's own location
-  at import time, so the old plain default pointed *inside whatever checkout happens to be running* — in the
-  Jenkins agent, that's the ephemeral workspace `checkout scm` wipes and recreates every build, not the persistent
-  `/onedrive/conf`/`/onedrive/data` Docker volumes `service/agent/compose.yml` actually mounts. A one-time `--auth`
-  token written to the old default would never survive to the next build.
+  `Path(os.environ.get("OD_CONF", str(default_onedrive_conf_folder())))` and the equivalent `OD_DATA` /
+  `default_onedrive_data_folder()` pair (the fallback computation moved into `defaults.py` in commit `64587cf` —
+  see "Path and folder-name composition" above; the env-var-override behavior itself is unchanged). This fixes a
+  real bug: `ROOT_FOLDER` is computed from the source file's own location at import time, so the old plain default
+  pointed *inside whatever checkout happens to be running* — in the Jenkins agent, that's the ephemeral workspace
+  `checkout scm` wipes and recreates every build, not the persistent `/onedrive/conf`/`/onedrive/data` Docker
+  volumes `service/agent/compose.yml` actually mounts. A one-time `--auth` token written to the old default would
+  never survive to the next build.
 - sync scope = `args.sharepoint_sync_folder`, passed as `--single-directory` — this is the *only* scope filter;
   there is no `sync_list` file anymore (deliberately deleted — it conflicted with `--single-directory` and caused a
   real local-data-loss incident when both were active at once)
 - `args.runtime_location` (computed: `onedrive_data_folder / sharepoint_sync_folder`, auto-created via
   `parse_directory` if missing) is what `run_all_phases` actually processes — `_output`/`QA_ERRORS` now nest
-  *inside* it, specifically so the upload pass can actually reach the merged-output/QA artifacts.
+  *inside* it (via `paths.py::merged_output_folder`/`qa_errors_folder`), specifically so the upload pass can
+  actually reach the merged-output/QA artifacts.
 
 **Why the fix lives at three layers, not just one:** `service/agent/dockerfile/Dockerfile` now sets
 `ENV OD_CONF=/onedrive/conf` and `ENV OD_DATA=/onedrive/data` at the *image* level — so any process started in that
@@ -195,8 +274,9 @@ just `onedrive --confdir <confdir> --syncdir <data_folder> --verbose`. No `--sin
 and persists the token with no file listing or transfer at all (one caveat: the sync engine's own `initialise()`
 still makes two small Graph metadata calls — drive details and root details — not a bulk download). `exit(0)`
 immediately after, so phases/upload never run in this mode. This replaced the earlier design, which scoped a real
-`--sync --download-only` pass to a dedicated empty remote folder (`FolderPaths.SHAREPOINT_AUTH_PATH`,
-`justifactu/_auth_sync`) — that folder/path constant no longer exists. **Known limitation of the new approach,
+`--sync --download-only` pass to a dedicated empty remote folder (the old `FolderPaths.SHAREPOINT_AUTH_PATH`,
+`justifactu/_auth_sync`) — that enum and its member no longer exist (and `FolderPaths` itself is gone entirely as
+of `64587cf` — see "Path and folder-name composition" above). **Known limitation of the new approach,
 intentionally accepted since `--auth` is documented as a one-time, per-new-system action:** re-running `--auth`
 after a token already exists for that `confdir` now exits non-zero ("missing switches") instead of the old design's
 harmless no-op, since the fast-fail path only triggers when a token is already present.
@@ -242,8 +322,9 @@ The deeper design rationale and decision log for this architecture live in the `
 are now superseded by what's actually implemented (D6's "compile from source" was amended to installing via the
 OBS apt repo; D21's "remove `download_only`/keep `cleanup_local_files` in config" is now "remove both from config,
 make both per-call CLI flags instead"; the `--auth` design has changed twice since; D19's "drop Microsoft Graph
-entirely" is now only true for the *upload* side — Graph is back for download, as a fallback). Treat the doc as
-historical context, not a live spec, until it's updated to match.
+entirely" is now only true for the *upload* side — Graph is back for download, as a fallback; and none of it yet
+reflects the `Mode`/`--mode`/`paths.py`/`defaults.py` split from `64587cf`). Treat the doc as historical context,
+not a live spec, until it's updated to match.
 
 ### Jenkins agent (`service/agent/`)
 
@@ -261,19 +342,26 @@ breaks the agent's startup.
 `Jenkinsfile` (repo root) is explicitly marked **draft, not wired into any real Jenkins job** — currently a
 single-stage pipeline (`make install && make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder
 ${OD_DATA} --dry-run"`, with a TODO to drop `--dry-run` once ready for real production runs), no `checkout scm`
-stage, no cron trigger, no build timeout. **`OD_CONF`/`OD_DATA` are no longer dead** — as of `3e51de9`/`e358ef4`
-they're both real, live-read environment variables (set at the container level in
-`service/agent/dockerfile/Dockerfile`, consumed by `arguments.py`'s CLI-arg defaults) — this reverses what an
-earlier version of this document said about `OD_CONF` being a vestigial, unused declaration. The `aborted`
-post-block's message still references a 20h-timeout/multi-night-convergence story that no longer applies to this
-architecture. Don't treat this file as a finished, production-ready pipeline.
+stage, no cron trigger, no build timeout, no `--mode` flag (so it silently runs in `Mode.TEST` — see "Path and
+folder-name composition" above). `OD_CONF`/`OD_DATA` are real, live-read environment variables (set at the
+container level in `service/agent/dockerfile/Dockerfile`, consumed via `defaults.py` by `arguments.py`'s CLI-arg
+defaults). The `post` blocks call `make notify` (`notify.py`) rather than the Jenkins `emailext` step, for the
+`failure`/`aborted` notifications. Don't treat this file as a finished, production-ready pipeline.
 
 ### Module layout (only the non-obvious relationships)
 
-- `arguments.py` → `defines.py`: CLI flags validate against enums defined in `defines.py` (`Phase`, `InputLocation`)
-  via small `parse_*` functions, each raising a specific `custom_except.py` exception on invalid input.
-  `parse_directory` (distinct from the now-orphaned `parse_input_location`) auto-creates a missing directory rather
-  than erroring, used by every OneDrive-path argument.
+- `defines.py` → bare-name `StrEnum`s only (`FolderName`, `Mode`, `Phase`, `InputLocation`, `SyncDirection`,
+  `FileSuffix`, `SecretNames`) plus `ROOT_FOLDER`/`NOW`/`DATETIME_FORMAT`. No composed `Path`s, no `FolderPaths`
+  (removed in `64587cf`) — see "Path and folder-name composition" above.
+- `paths.py` → composes runtime `Path`s from an already-resolved base directory (+ `Mode` where relevant) and
+  `FolderName` segments; replaces the hand-rolled joins that used to be duplicated in `process.py`/`main.py`.
+- `defaults.py` → composes the `ROOT_FOLDER`-relative fallback `Path`s `arguments.py`'s CLI flags fall back to
+  when no override is given; existed before `64587cf` but was dead code until that commit actually wired
+  `arguments.py` up to call it.
+- `arguments.py` → `defines.py`/`defaults.py`/`paths.py`: CLI flags validate against enums defined in `defines.py`
+  (`Phase`, `Mode`, `InputLocation`) via small `parse_*` functions, each raising a specific `custom_except.py`
+  exception on invalid input. `parse_directory` (distinct from the now-orphaned `parse_input_location`)
+  auto-creates a missing directory rather than erroring, used by every OneDrive-path argument.
 - `onedrive_sync.py`: `_base_onedrive_args(confdir, data_folder)` builds the flags common to **every** invocation
   (`--confdir`, `--syncdir`, `--verbose`) — as of commit `8ec9257`, `single_dir`/`--single-directory` moved *out* of
   it and into `run_onedrive_sync` itself (the only caller that needs it), and `run_onedrive_auth` was switched to
@@ -283,7 +371,13 @@ architecture. Don't treat this file as a finished, production-ready pipeline.
 - `sharepoint.py`: Graph API fallback for the OneDrive download step only — see "SharePoint/Graph API code" above.
   Not used for upload under any circumstance; `onedrive --upload-only` remains the only upload path.
 - `logger.py`: a `extra={"qa_report": True}` tag on any `log.*()` call routes that line into a separate QA report
-  file (mailed via `mail.py::send_qa_report_mail`), independent of the main run log.
-- `secret.py` / `vault.py`: secrets resolve through a fallback chain (mounted Docker secret → repo `secrets/` file →
-  env var → HashiCorp Vault), so the same code runs unmodified in local dev and deployed containers. `vault.py`'s
+  file (mailed via `mail.py::send_qa_report_mail`), independent of the main run log. `GENERAL_OUTPUT_FOLDER`/
+  `ADMIN_LOG_FOLDER` compose from `FolderName.GENERAL_OUTPUT`/`ADMIN_LOGS` as of `64587cf` — see "Path and
+  folder-name composition" above for the bug this fixed.
+- `secret.py` / `vault.py`: secrets resolve through a fallback chain (mounted Docker secret → `default_secrets_folder()`
+  → env var → HashiCorp Vault), so the same code runs unmodified in local dev and deployed containers. `vault.py`'s
   `_SECRET_MAP` is the authoritative list of which `SecretNames` values actually have a Vault path configured.
+- `notify.py`: standalone entry point (`justifactu-notify` console script, `make notify`) for a one-off
+  notification email with optional attachments — calls `mail.py::send_mail_authenticated` directly and lets
+  exceptions propagate, unlike `main()`'s own QA-mail call which swallows failures. Used by the `Jenkinsfile`'s
+  `post { failure }`/`post { aborted }` blocks instead of the Jenkins `emailext` step.

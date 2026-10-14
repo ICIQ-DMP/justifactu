@@ -9,7 +9,7 @@
 
 <br />
 <div align="center">
-<a href="[https://github.com/ICIQ-DMP/justifactu](https://github.com/ICIQ-DMP/justifactu)">
+<a href="https://github.com/ICIQ-DMP/justifactu">
     <img src="https://raw.githubusercontent.com/ICIQ-DMP/ICIQ-DMP.github.io/refs/heads/master/assets/images/logo-ICIQ-horizontal-catalan.png" alt="Logo" width="all" height="all">
   </a>
 <h3 align="center">justifactu</h3>
@@ -17,11 +17,9 @@
   <p align="center">
     Software to automate billing justification at ICIQ.
     <br />
-    <a href="https://github.com/ICIQ-DMP/justifactu"><strong>Explore the docs »</strong></a>
+    <a href="https://iciq-dmp.github.io/justifactu-docs/"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://github.com/ICIQ-DMP/justifactu">View Demo</a>
-    &middot;
     <a href="https://github.com/ICIQ-DMP/justifactu/issues/new?labels=bug&template=bug-report---.md">Report Bug</a>
     &middot;
     <a href="https://github.com/ICIQ-DMP/justifactu/issues/new?labels=enhancement&template=feature-request---.md">Request Feature</a>
@@ -48,14 +46,26 @@
       </ul>
     </li>
     <li><a href="#usage">Usage</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#deploy-to-production">Deploy to production</a></li>
     <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
-    <li><a href="#acknowledgments">Acknowledgments</a></li>
   </ol>
 </details>
 
+
+## About The Project
+
+justifactu automates matching and merging bills (*factures*) with their corresponding payments (*remeses*) stored in
+SharePoint. Payments are renamed to the SAP ID found inside their PDF content; bills, already named with their SAP
+ID, are matched against that renamed set and combined into a single justification PDF per pair. It replaces a
+manual, repetitive process that previously took significant time each month for the people responsible for these
+justifications, leaving only the final review as manual work.
+
+The pipeline runs as a one-shot process: a OneDrive-for-Linux sync brings the relevant SharePoint folder down to
+local disk, the matching/merging logic runs entirely against that local copy, and a second one-shot sync pushes the
+results (and any renames/deletions) back up. For the full architecture, decision log, and data-flow documentation,
+see the [docs site](https://iciq-dmp.github.io/justifactu-docs/) (source: [justifactu-docs](https://github.com/ICIQ-DMP/justifactu-docs)).
 
 ### Built With
 
@@ -88,41 +98,61 @@ You may follow these steps to get a local copy up and running.
    ```sh
    git clone https://github.com/ICIQ-DMP/justifactu.git
    ```
-2. Initialize the virtual environment:
+2. Initialize the virtual environment and install git hooks:
    ```sh
     cd justifactu
-    make install 
+    make dev
     ```
 
-## Deploy to production                                                                                                                                                                                                                                                                                                                            
-
-TODO: move into docs, and makefile target
-
-Generate keys:                                                                                                                                                                                                                                                                                                                                     
-```shell                                                                                                                                                                                                                                                                                                                                           
-ssh-keygen -t ed25519 -C "jenkins@justifactu-agent" -N "" -f service/agent/keys/id_rsa                                                                                                                                                                                        
-```                                                                                                                                                                                                                                                                                                                                                
-                                                                                                                                                                                                                                                                                                                                                   
-Copy the public key into .env.                                                                                                                                                                                                                                                                                                                     
-                                                                                                                                                                                                                                                                                                                                                   
-Enter into jenkins, create or modify agent, and select                                                                                                                                                                                                                                                                                             
-                                                                                                                                                                                                                                                                                                                                                   
-```shell                                                                                                                                                                                                                                                                                                                                           
-docker compose -f compose.prod.yml up --build --remove-orphans                                                                                                                                                                                                                                                                                     
-```                
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
-<!-- USAGE EXAMPLES 
+<!-- USAGE EXAMPLES -->
 ## Usage
 
-Use this space to show useful examples of how a project can be used. Additional screenshots, code examples and demos work well in this space. You may also link to more resources.
+All commands are defined once in the `Makefile` and run through it; `CMD` passes flags straight to the underlying
+`python -m justifactu` invocation.
 
-_For more examples, please refer to the [Documentation](https://example.com)_
+```sh
+make run CMD="--help"              # list every CLI flag
+make run CMD=""                    # full run against SharePoint, test-mode folders (the default)
+make run CMD="--mode prod"         # full run against SharePoint, production folders
+make run CMD="--auth"              # one-time OAuth bootstrap for a fresh OneDrive confdir
+make run CMD="--dry-run"           # preview the OneDrive sync without applying it
+make run CMD="--phase 1"           # run only payment renaming, against local data, no sync
+make run CMD="--phase 2"           # run only bill/payment matching and merging, against local data, no sync
+```
+
+Common flags: `-l/--location` (`sharepoint`/`local`), `--auth`, `--dry-run`, `-p/--phase` (`1`/`2`/`3`, isolated
+single-stage testing), `--mode` (`prod`/`test`, default `test`), `--onedrive-data-folder`, `--onedrive-conf-folder`,
+`--sharepoint-sync-folder`, `--runtime-location`. Full architecture and the reasoning behind each flag are documented
+in the [docs site](https://iciq-dmp.github.io/justifactu-docs/).
+
+Other Makefile targets:
+
+```sh
+make test      # run the test suite (pytest)
+make lint      # static checks (ruff + mypy, strict)
+make fmt       # auto-format (black + ruff --fix)
+make notify CMD="--subject '...' --body '...'"   # send a one-off notification email
+make docker-build / make docker-push             # build/push the app's Docker image
+```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
--->
+
+
+## Deploy to production
+
+Production runs on a dedicated Jenkins agent image, defined in `service/agent/` and built from
+`service/agent/dockerfile/Dockerfile` — a separate image from the app's own `Dockerfile`, carrying the `onedrive`
+binary and SSH-agent setup Jenkins drives builds on.
+
+```sh
+make prodbuild    # build the Jenkins agent image (service/agent/compose.yml)
+make prodrun       # build and start it, detached
+```
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 
 <!-- CONTRIBUTING -->
@@ -159,9 +189,9 @@ Distributed under the GNU GPL v3. See `LICENSE.txt` for more information.
 <!-- CONTACT -->
 ## Contact
 
-David Romero - [dromero@iciq.es](dromero@iciq.es)
+Aleix Mariné-Tena- [amarine@iciq.es](amarine@iciq.es)
 
-Aleix Mariné - [amarine@iciq.es](amarine@iciq.es)
+David Romero San Millán- [dromero@iciq.es](dromero@iciq.es)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -212,35 +242,3 @@ Aleix Mariné - [amarine@iciq.es](amarine@iciq.es)
 
 [Git]: https://img.shields.io/badge/Git-F05032?style=for-the-badge&logo=git&logoColor=white
 [Git-url]: https://git-scm.com/
-
-<!--
-### Algorithm for cards
-
-```pseudocode
-si current.month <= 3:
-  years = [current.year, current.year - 1]
-else
-  years = [current.year]
-
-excels = years_to_excels(years)
-  
-per excel en excels:
-  per fila en excel:
-    si col_J està ple i col_J es numero i col_K es buida:
-      mes = col_B
-      justificant = col_J + "_P.pdf"
-      nom_pdf_targeta = 
-
-```
-
-### Algorithm for merging bills and payments
-```pseudocode
-per factura a carpeta_factura:
-  justificant = factura.nom.substitute("F", "P")
-  si justificant existeix:
-    juntar_pdfs(factura, justificant, dst=factura_mes_pagament(factura, pagament))
-    borrar(factura)
-    borrar(pagament)
-
-```
--->

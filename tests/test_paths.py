@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from pathlib import Path
 
-from justifactu.defines import Mode
+from justifactu.defines import Mode, FolderName
 from justifactu.paths import (
     bills_folder,
     payments_folder,
@@ -28,46 +28,60 @@ from justifactu.paths import (
 
 
 def test_bills_folder_prod():
-    assert bills_folder(Path("/base"), Mode.PROD) == Path("/base/FACTURES")
+    assert (
+        bills_folder(Path("/base"), Mode.PROD)
+        == Path("/base") / FolderName.BILLS_INPUT_PROD.value
+    )
 
 
 def test_bills_folder_test():
-    assert bills_folder(Path("/base"), Mode.TEST) == Path(
-        "/base/carpeta_proves/FACTURES_prova"
+    assert bills_folder(Path("/base"), Mode.TEST) == (
+        Path("/base") / FolderName.TEST_FOLDER.value / FolderName.BILLS_INPUT_TEST.value
     )
 
 
 def test_payments_folder_prod():
-    assert payments_folder(Path("/base"), Mode.PROD) == Path("/base/Remeses")
+    assert (
+        payments_folder(Path("/base"), Mode.PROD)
+        == Path("/base") / FolderName.PAYMENTS_INPUT_PROD.value
+    )
 
 
 def test_payments_folder_test():
-    assert payments_folder(Path("/base"), Mode.TEST) == Path(
-        "/base/carpeta_proves/Remeses_prova"
+    assert payments_folder(Path("/base"), Mode.TEST) == (
+        Path("/base")
+        / FolderName.TEST_FOLDER.value
+        / FolderName.PAYMENTS_INPUT_TEST.value
     )
 
 
 def test_merged_output_folder():
-    assert merged_output_folder(Path("/base")) == Path(
-        "/base/_output/FACTURES+PAGAMENTS"
+    assert merged_output_folder(Path("/base")) == (
+        Path("/base") / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
     )
 
 
 def test_qa_errors_folder():
-    assert qa_errors_folder(Path("/base/_output/FACTURES+PAGAMENTS")) == Path(
-        "/base/_output/FACTURES+PAGAMENTS/QA_ERRORS"
-    )
+    base = Path("/base") / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
+    assert qa_errors_folder(base) == base / FolderName.QA_ERRORS.value
 
 
 def test_year_merged_folder():
-    assert year_merged_folder(Path("/base/_output/FACTURES+PAGAMENTS"), "2025") == Path(
-        "/base/_output/FACTURES+PAGAMENTS/2025_FACTURA+PAGAMENT"
+    base = Path("/base") / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
+    assert year_merged_folder(base, "2025") == base / (
+        "2025" + FolderName.YEAR_FOLDER_SUFFIX.value
     )
 
 
 def test_sharepoint_sync_folder():
-    assert sharepoint_sync_folder() == Path("justifactu/runtime")
+    assert (
+        sharepoint_sync_folder()
+        == Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
+    )
 
 
 def test_sharepoint_auth_folder():
-    assert sharepoint_auth_folder() == Path("justifactu/_auth_sync")
+    assert (
+        sharepoint_auth_folder()
+        == Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.AUTH_SYNC.value
+    )

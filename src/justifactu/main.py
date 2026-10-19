@@ -57,14 +57,14 @@ def main() -> None:
 
     log.info("Starting...")
 
-    try:
-        if args.auth and args.location == InputLocation.SHAREPOINT:
-            run_onedrive_auth(
-                confdir,
-                data_folder=args.onedrive_data_folder,
-            )
-            exit(0)
+    if args.auth and args.location == InputLocation.SHAREPOINT:
+        run_onedrive_auth(
+            confdir,
+            data_folder=args.onedrive_data_folder,
+        )
+        return
 
+    try:
         try:
             run_onedrive_sync(
                 confdir,

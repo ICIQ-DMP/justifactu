@@ -80,7 +80,7 @@ def main() -> None:
             )
             try:
                 token_manager, _, drive_id = connect_sharepoint()
-                print("Downloading OneDrive content using API as fallback")
+                log.warning("Downloading OneDrive content using API as fallback")
                 download_input_folder(
                     token_manager,
                     drive_id,

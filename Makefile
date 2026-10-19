@@ -103,6 +103,9 @@ run: install  ## Run the justifactu CLI (python -m justifactu)
 notify: install  ## Send a notification email (python -m justifactu.notify)
 	@$(PYTHON) -m $(PKG_NAME).notify $(CMD)
 
+auth: install  ## One-time OneDrive OAuth bootstrap for later non-interactive runs (python -m justifactu --auth)
+	@$(PYTHON) -m $(PKG_NAME) --auth
+
 # ---- docker ---------------------------------------------------------------
 
 docker-build:  ## Build the Docker image
@@ -133,7 +136,7 @@ prodrun: prodbuild  ## Start the production Jenkins agent (detached)
 
 # ---- meta -----------------------------------------------------------------
 
-.PHONY: lint fmt test run clean help dist install docker-build docker-push FORCE prodbuild prodrun
+.PHONY: lint fmt test run auth clean help dist install docker-build docker-push FORCE prodbuild prodrun
 
 help:  ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .+$$' $(MAKEFILE_LIST) | \

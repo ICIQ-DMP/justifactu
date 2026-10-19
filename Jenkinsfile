@@ -36,7 +36,7 @@ pipeline {
                 sh '''
                     set -eu
                     make install
-                    make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder ${OD_DATA} --dry-run"  # TODO: remove when we enter into production
+                    make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder ${OD_DATA}"
                 '''
             }
         }

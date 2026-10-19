@@ -91,6 +91,7 @@ def run_onedrive_sync(
         if dry_run:
             args_list.append("--dry-run")
 
+        log.debug(f"Running onedrive sync with command: {' '.join(args_list)}")
         subprocess.run(args_list, check=True)
         log.info(f"OneDrive {direction} sync complete.")
     except subprocess.CalledProcessError as e:

@@ -54,6 +54,13 @@ def merge_bills_and_payments(
         **index_payments(index_folder(payments_folder)),
         **(freshly_renamed_payments or {}),
     }
+    # A bank statement file can be matched by more than one SAP ID (several
+    # bills paid in the same statement); only rename/clean it up once every
+    # SAP ID pointing at it has been consumed.
+    remaining_matches: dict[Path, int] = {}
+    for path in payment_map.values():
+        remaining_matches[path] = remaining_matches.get(path, 0) + 1
+
     successful_payments: set[Path] = set()
     qa_folder = qa_errors_folder(merge_folder)
     qa_folder.mkdir(parents=True, exist_ok=True)
@@ -93,10 +100,13 @@ def merge_bills_and_payments(
             merge_pdfs(bill_path, matched_payment, output_path)
             successful_payments.add(matched_payment)
 
+            remaining_matches[matched_payment] -= 1
+
             cleanup_processed_files(
                 bill_path,
                 matched_payment,
                 delete_processed,
+                rename_payment=remaining_matches[matched_payment] == 0,
             )
         except MergingBillWithPaymentError as e:
             log.exception(f"Failed to process {bill_path.name}: {e}")
@@ -106,12 +116,14 @@ def cleanup_processed_files(
     bill_path: Path,
     matched_payment: Path,
     delete_processed: bool,
+    rename_payment: bool = True,
 ) -> None:
     """Renames the payment file and optionally deletes the bill file"""
-    new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT.value}"
     try:
-        change_file_name(matched_payment, new_name)
-        log.info(f"Renamed processed payment file: {matched_payment.name}")
+        if rename_payment:
+            new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT.value}"
+            change_file_name(matched_payment, new_name)
+            log.info(f"Renamed processed payment file: {matched_payment.name}")
 
         if delete_processed:
             bill_path.unlink(missing_ok=True)

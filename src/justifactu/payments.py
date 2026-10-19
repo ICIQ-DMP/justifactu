@@ -20,6 +20,7 @@ from .SAP_ID import SAP_ID, parse_sap_id_from_string
 from .filesystem import change_file_name
 from .logger import get_logger
 
+from .bank_statement import index_statement_entries
 from .bills import parse_sap_id_from_bill
 from .custom_except import (
     ParseSAPIdException,
@@ -86,6 +87,21 @@ def rename_payments(
             renamed_this_run[SAP_ID(sap_id)] = renamed_path
 
         except (ParseSAPIdException, FileNotFoundError) as e:
-            log.error(f"Failed to rename {entry}: {e}")
+            # Not a single-payment PDF - try treating it as a multi-row bank
+            # statement instead, where each row may carry its own SAP ID.
+            # The file itself is not renamed: a single statement can match
+            # several bills, so there's no one SAP ID to rename it to.
+            statement_entries = index_statement_entries(entry)
+
+            if not statement_entries:
+                log.error(f"Failed to rename {entry}: {e}")
+                continue
+
+            log.info(
+                f"Indexed {len(statement_entries)} entries from bank "
+                f"statement {entry.name}"
+            )
+            for statement_sap_id in statement_entries:
+                renamed_this_run[statement_sap_id] = entry
 
     return renamed_this_run

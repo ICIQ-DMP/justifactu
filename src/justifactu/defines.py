@@ -51,15 +51,16 @@ class FolderName(StrEnum):
 
     BILLS_INPUT_PROD = "FACTURES"
     BILLS_INPUT_TEST = "FACTURES_prova"
+
     PAYMENTS_INPUT_PROD = "Remeses"
     PAYMENTS_INPUT_TEST = "Remeses_prova"
+
     TEST_FOLDER = "carpeta_proves"
     MERGED_OUTPUT = "FACTURES+PAGAMENTS"
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
     SHAREPOINT_ROOT = "justifactu"
     RUNTIME = "runtime"
-    OUTPUT = "_output"
     GENERAL_OUTPUT = "output"
     ADMIN_LOGS = "_admin_logs"
     SERVICE = "service"

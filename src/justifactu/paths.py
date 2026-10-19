@@ -40,7 +40,7 @@ def payments_folder(input_folder: Path, mode: Mode) -> Path:
 
 
 def merged_output_folder(input_folder: Path) -> Path:
-    return input_folder / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
+    return input_folder / FolderName.MERGED_OUTPUT.value
 
 
 def qa_errors_folder(merged_output_folder: Path) -> Path:

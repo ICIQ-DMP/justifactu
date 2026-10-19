@@ -28,3 +28,12 @@ RUN apt-get update && \
 
 COPY scripts/install-onedrive-apt.sh .
 RUN bash install-onedrive-apt.sh
+
+# /onedrive/conf and /onedrive/data are mounted as named volumes by compose.yml; /onedrive/logs
+# (the client's own log_dir, service/onedrive/conf/config) has no volume at all. None of the
+# three exist in the image otherwise, so on first mount Docker would create /onedrive/conf and
+# /onedrive/data as fresh root:root 0755 dirs — unwritable by the non-root `jenkins` user Jenkins
+# SSH build steps actually run as. Creating them here, owned by jenkins, means Docker's
+# volume-initialization-from-image copies that ownership into the new volumes on first mount.
+RUN mkdir -p /onedrive/conf /onedrive/data /onedrive/logs && \
+    chown -R jenkins:jenkins /onedrive

@@ -26,7 +26,7 @@ from justifactu.defines import (
     SyncDirection,
     InputLocation,
 )
-from justifactu.paths import merged_output_folder, qa_errors_folder
+from justifactu.paths import merged_bills_and_payments_folder, qa_errors_folder
 from justifactu.logger import (
     ADMIN_LOG_FOLDER,
     configure_logging_from_settings,
@@ -94,7 +94,9 @@ def main() -> None:
 
         run_all_phases(args.runtime_location, args.mode)
 
-        bills_plus_payments_folder = merged_output_folder(args.runtime_location)
+        bills_plus_payments_folder = merged_bills_and_payments_folder(
+            args.runtime_location, args.mode
+        )
         qa_folder = qa_errors_folder(bills_plus_payments_folder)
         qa_folder.mkdir(parents=True, exist_ok=True)
         copy_file(qa_report_path, qa_folder)

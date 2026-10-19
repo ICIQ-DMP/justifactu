@@ -28,7 +28,7 @@ from .defines import FileSuffix, Phase, Mode
 from .paths import (
     bills_folder,
     payments_folder,
-    merged_output_folder,
+    merged_bills_and_payments_folder,
     qa_errors_folder,
     year_merged_folder,
 )
@@ -131,7 +131,7 @@ def _phase_folders(input_folder: Path, mode: Mode) -> tuple[Path, Path, Path]:
     return (
         bills_folder(input_folder, mode),
         payments_folder(input_folder, mode),
-        merged_output_folder(input_folder),
+        merged_bills_and_payments_folder(input_folder, mode),
     )
 
 

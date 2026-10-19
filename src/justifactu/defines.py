@@ -49,18 +49,22 @@ class Mode(StrEnum):
 class FolderName(StrEnum):
     """Named folders used across the pipeline."""
 
+    # Sharepoint folders
+    SHAREPOINT_ROOT_FOLDER = "justifactu"
+
+    RUNTIME = "runtime"
+
     BILLS_INPUT_PROD = "FACTURES"
     BILLS_INPUT_TEST = "FACTURES_prova"
 
     PAYMENTS_INPUT_PROD = "Remeses"
     PAYMENTS_INPUT_TEST = "Remeses_prova"
 
-    TEST_FOLDER = "carpeta_proves"
-    MERGED_OUTPUT = "FACTURES+PAGAMENTS"
+    MERGED_OUTPUT_PROD = "FACTURES+PAGAMENTS"
+    MERGED_OUTPUT_TEST = "FACTURES+PAGAMENTS_prova"
+
     QA_ERRORS = "QA_ERRORS"
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
-    SHAREPOINT_ROOT = "justifactu"
-    RUNTIME = "runtime"
     GENERAL_OUTPUT = "output"
     ADMIN_LOGS = "_admin_logs"
     SERVICE = "service"
@@ -68,7 +72,6 @@ class FolderName(StrEnum):
     ONEDRIVE_DATA = "data"
     ONEDRIVE_CONF = "conf"
     SECRETS = "secrets"
-    AUTH_SYNC = "_auth_sync"
 
 
 class Phase(StrEnum):

@@ -28,6 +28,7 @@ log = get_logger(__name__)
 def _set_drive_id(confdir: Path, drive_id: str) -> None:
     """Rewrites the drive_id line in the onedrive config file."""
     config_path = confdir / "config"
+    config_path.touch(exist_ok=True)
     lines = config_path.read_text().splitlines()
     new_lines = []
     found = False

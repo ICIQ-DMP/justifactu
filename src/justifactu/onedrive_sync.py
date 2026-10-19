@@ -108,7 +108,7 @@ def run_onedrive_sync(
                 "OneDrive requires a --resync (no matching .config.backup found); "
                 "retrying once with --resync."
             )
-            subprocess.run(args_list + ["--resync"], check=True)
+            subprocess.run(args_list + ["--resync", "--resync-auth"], check=True)
         log.info(f"OneDrive {direction} sync complete.")
     except subprocess.CalledProcessError as e:
         raise MainCriticalError(

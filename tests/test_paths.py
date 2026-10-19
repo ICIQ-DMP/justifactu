@@ -15,7 +15,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from pathlib import Path
 
-from justifactu.defines import Mode, FolderName
+from justifactu.defines import Mode, FolderName, FileSuffix
 from justifactu.paths import (
     bills_folder,
     payments_folder,
@@ -42,37 +42,37 @@ def test_bills_folder_test():
 def test_payments_folder_prod():
     assert (
         payments_folder(Path("/base"), Mode.PROD)
-        == Path("/base") / FolderName.PAYMENTS_INPUT_PROD.value
+        == Path("/base") / FolderName.PAYMENTS_PROD.value
     )
 
 
 def test_payments_folder_test():
     assert payments_folder(Path("/base"), Mode.TEST) == (
-        Path("/base") / FolderName.PAYMENTS_INPUT_TEST.value
+        Path("/base") / FolderName.PAYMENTS_TEST.value
     )
 
 
 def test_merged_output_folder_prod():
     assert merged_bills_and_payments_folder(Path("/base"), Mode.PROD) == (
-        Path("/base") / FolderName.MERGED_OUTPUT_PROD.value
+        Path("/base") / FolderName.BILLS_AND_PAYMENTS_PROD.value
     )
 
 
 def test_merged_output_folder_test():
     assert merged_bills_and_payments_folder(Path("/base"), Mode.TEST) == (
-        Path("/base") / FolderName.MERGED_OUTPUT_TEST.value
+        Path("/base") / FolderName.BILLS_AND_PAYMENTS_TEST.value
     )
 
 
 def test_qa_errors_folder():
-    base = Path("/base") / FolderName.MERGED_OUTPUT_PROD.value
+    base = Path("/base") / FolderName.BILLS_AND_PAYMENTS_PROD.value
     assert qa_errors_folder(base) == base / FolderName.QA_ERRORS.value
 
 
 def test_year_merged_folder():
-    base = Path("/base") / FolderName.MERGED_OUTPUT_PROD.value
+    base = Path("/base") / FolderName.BILLS_AND_PAYMENTS_PROD.value
     assert year_merged_folder(base, "2025") == base / (
-        "2025" + FolderName.YEAR_FOLDER_SUFFIX.value
+        "2025" + FileSuffix.YEAR_FOLDER_SUFFIX.value
     )
 
 

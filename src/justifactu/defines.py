@@ -50,28 +50,29 @@ class FolderName(StrEnum):
     """Named folders used across the pipeline."""
 
     # Sharepoint folders
-    SHAREPOINT_ROOT_FOLDER = "justifactu"
+    SHAREPOINT_ROOT = "justifactu"
 
     RUNTIME = "runtime"
 
-    BILLS_INPUT_PROD = "FACTURES"
-    BILLS_INPUT_TEST = "FACTURES_prova"
+    BILLS_PROD = "FACTURES"
+    BILLS_TEST = "FACTURES_prova"
 
-    PAYMENTS_INPUT_PROD = "Remeses"
-    PAYMENTS_INPUT_TEST = "Remeses_prova"
+    PAYMENTS_PROD = "Remeses"
+    PAYMENTS_TEST = "Remeses_prova"
 
-    MERGED_OUTPUT_PROD = "FACTURES+PAGAMENTS"
-    MERGED_OUTPUT_TEST = "FACTURES+PAGAMENTS_prova"
+    BILLS_AND_PAYMENTS_PROD = "FACTURES+PAGAMENTS"
+    BILLS_AND_PAYMENTS_TEST = "FACTURES+PAGAMENTS_prova"
 
     QA_ERRORS = "QA_ERRORS"
-    YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
-    GENERAL_OUTPUT = "output"
-    ADMIN_LOGS = "_admin_logs"
+
+    # Repository folders
+    LOGS = "logs"
+    SECRETS = "secrets"
+
     SERVICE = "service"
     ONEDRIVE = "onedrive"
     ONEDRIVE_DATA = "data"
     ONEDRIVE_CONF = "conf"
-    SECRETS = "secrets"
 
 
 class Phase(StrEnum):
@@ -85,6 +86,7 @@ class FileSuffix(StrEnum):
 
     MERGED_BILL_PAYMENT = "_F_P"
     PROCESSED_PAYMENT = "_merged"
+    YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
 
 
 class SecretNames(StrEnum):

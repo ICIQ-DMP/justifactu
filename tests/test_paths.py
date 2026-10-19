@@ -29,13 +29,13 @@ from justifactu.paths import (
 def test_bills_folder_prod():
     assert (
         bills_folder(Path("/base"), Mode.PROD)
-        == Path("/base") / FolderName.BILLS_INPUT_PROD.value
+        == Path("/base") / FolderName.BILLS_PROD.value
     )
 
 
 def test_bills_folder_test():
     assert bills_folder(Path("/base"), Mode.TEST) == (
-        Path("/base") / FolderName.BILLS_INPUT_TEST.value
+        Path("/base") / FolderName.BILLS_TEST.value
     )
 
 
@@ -79,5 +79,5 @@ def test_year_merged_folder():
 def test_sharepoint_sync_folder():
     assert (
         sharepoint_sync_folder()
-        == Path(FolderName.SHAREPOINT_ROOT_FOLDER.value) / FolderName.RUNTIME.value
+        == Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
     )

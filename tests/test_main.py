@@ -17,8 +17,6 @@ import argparse
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from justifactu.defines import InputLocation, Phase, Mode
 from justifactu.main import main
 
@@ -46,7 +44,6 @@ def test_auth_branch_calls_run_onedrive_auth_and_exits_before_phases(tmp_path):
     args = _auth_args(tmp_path)
 
     with (
-        patch("justifactu.main.process_parse_arguments", return_value=args),
         patch("justifactu.main.configure_logging_from_settings"),
         patch("justifactu.main.run_onedrive_auth") as mock_auth,
         patch("justifactu.main.run_onedrive_sync") as mock_sync,
@@ -54,18 +51,17 @@ def test_auth_branch_calls_run_onedrive_auth_and_exits_before_phases(tmp_path):
         patch(
             "justifactu.main.process_parse_arguments", return_value=args
         ) as mock_parse,
-        patch("builtins.exit", side_effect=SystemExit(0)) as mock_exit,
+        patch("justifactu.main.send_qa_report_mail") as mock_mail,
     ):
-        with pytest.raises(SystemExit):
-            main()
+        main()
 
     mock_auth.assert_called_once_with(
         args.onedrive_conf_folder, data_folder=args.onedrive_data_folder
     )
     mock_parse.assert_called_once()
-    mock_exit.assert_called_once_with(0)
     mock_sync.assert_not_called()
     mock_phases.assert_not_called()
+    mock_mail.assert_not_called()
 
 
 def test_phase_flag_calls_run_phase_and_skips_main_pipeline(tmp_path):

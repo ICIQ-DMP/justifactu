@@ -147,13 +147,15 @@ def _phase_folders(input_folder: Path, mode: Mode) -> tuple[Path, Path, Path]:
     )
 
 
-def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[], None]]:
+def _build_phase_map(
+    input_folder: Path, mode: Mode, ledger_path: Path
+) -> dict[Phase, Callable[[], None]]:
     bills_folder_path, payments_folder_path, bills_plus_payments_folder = (
         _phase_folders(input_folder, mode)
     )
 
     def _run_phase_1() -> None:
-        rename_payments(payments_folder_path)
+        rename_payments(payments_folder_path, ledger_path)
 
     def _run_phase_2() -> None:
         merge_bills_and_payments(
@@ -170,14 +172,14 @@ def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[],
     }
 
 
-def run_phase(phase: Phase, input_folder: Path, mode: Mode) -> None:
-    _build_phase_map(input_folder, mode)[phase]()
+def run_phase(phase: Phase, input_folder: Path, mode: Mode, ledger_path: Path) -> None:
+    _build_phase_map(input_folder, mode, ledger_path)[phase]()
 
 
 FULL_RUN_PHASES: tuple[Phase, ...] = (Phase.PHASE_1, Phase.PHASE_2)
 
 
-def run_all_phases(input_folder: Path, mode: Mode) -> None:
-    phase_map = _build_phase_map(input_folder, mode)
+def run_all_phases(input_folder: Path, mode: Mode, ledger_path: Path) -> None:
+    phase_map = _build_phase_map(input_folder, mode, ledger_path)
     for phase in FULL_RUN_PHASES:
         phase_map[phase]()

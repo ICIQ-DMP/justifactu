@@ -56,6 +56,7 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
 
 def rename_payments(
     pdf_path: Path,
+    ledger_path: Path,
 ) -> dict[SAP_ID, Path]:
     """Renames the files from the payments folder, returning a SAP ID -> local path
     map for the files renamed in this run (so matching doesn't have to wait for
@@ -91,7 +92,7 @@ def rename_payments(
             # statement instead, where each row may carry its own SAP ID.
             # The file itself is not renamed: a single statement can match
             # several bills, so there's no one SAP ID to rename it to.
-            statement_entries = index_statement_entries(entry)
+            statement_entries = index_statement_entries(entry, ledger_path)
 
             if not statement_entries:
                 log.error(f"Failed to rename {entry}: {e}")

@@ -39,6 +39,7 @@ def _phase_args(tmp_path: Path) -> argparse.Namespace:
         phase=Phase.PHASE_1,
         runtime_location=tmp_path / "runtime",
         mode=Mode.TEST,
+        ledger_path=tmp_path / "ledger.xlsx",
     )
 
 
@@ -83,6 +84,8 @@ def test_phase_flag_calls_run_phase_and_skips_main_pipeline(tmp_path):
         main()
 
     mock_parse.assert_called_once()
-    mock_run_phase.assert_called_once_with(args.phase, args.runtime_location, args.mode)
+    mock_run_phase.assert_called_once_with(
+        args.phase, args.runtime_location, args.mode, args.ledger_path
+    )
     mock_sync.assert_not_called()
     mock_phases.assert_not_called()

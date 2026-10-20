@@ -15,7 +15,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from unittest.mock import MagicMock, patch
 
-
 from justifactu.bank_statement import (
     BankEntry,
     _group_into_rows,
@@ -186,25 +185,3 @@ def test_extract_bank_entries_combines_multiple_pages(tmp_path):
         BankEntry(date="0101", concept="Compra", total=56.78),
         BankEntry(date="0202", concept="Taxi", total=82.99),
     ]
-
-
-# ── index_statement_entries ───────────────────────────────────────────────────
-
-
-def test_index_statement_entries_maps_sap_id_to_entry():
-    # TODO: patch extract_bank_entries directly (no need to re-mock pdfplumber
-    # here) to return one BankEntry whose concept contains a valid SAP ID.
-    # Assert the result dict has that SAP_ID mapped to the entry.
-    pass
-
-
-def test_index_statement_entries_skips_entry_without_sap_id():
-    # TODO: a BankEntry whose concept has no parseable SAP ID should be
-    # excluded from the result, not raise.
-    pass
-
-
-def test_index_statement_entries_multiple_entries():
-    # TODO: several BankEntry values with distinct SAP IDs should all end up
-    # in the result dict.
-    pass

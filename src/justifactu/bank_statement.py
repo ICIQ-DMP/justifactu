@@ -18,9 +18,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
 
+import openpyxl
 import pdfplumber
 
-from .SAP_ID import SAP_ID, parse_sap_id_from_string
+from .SAP_ID import SAP_ID
 from .custom_except import ParseSAPIdException
 from .logger import get_logger
 
@@ -99,18 +100,63 @@ def extract_bank_entries(pdf_path: Path) -> list[BankEntry]:
     return entries
 
 
-def index_statement_entries(pdf_path: Path) -> dict[SAP_ID, BankEntry]:
-    """Maps each SAP ID found in a bank statement's transaction concepts
-    to the entry it was found in. Entries whose concept carries no SAP ID
-    are logged to the QA report and skipped."""
+def read_sap_id_ledger(ledger_path: Path) -> dict[tuple[str, float], SAP_ID]:
+    """Reads the reconciliation ledger (date/concept/total/SAP ID columns)
+    into a (date, total) -> SAP_ID lookup. Rows with no SAP ID in column J
+    are skipped."""
+    ledger: dict[tuple[str, float], SAP_ID] = {}
+
+    workbook = openpyxl.load_workbook(ledger_path, read_only=True, data_only=True)
+    sheet = workbook.active
+    if sheet is None:
+        raise ValueError(f"No active sheet found in ledger {ledger_path}")
+
+    for row in sheet.iter_rows(min_row=2, values_only=True):
+        date_cell, sap_id_cell = row[0], row[9]
+        total_cell = row[7]
+
+        if not sap_id_cell:
+            continue
+        if not isinstance(total_cell, (int, float)):
+            log.warning(
+                f"Non-numeric total {total_cell!r} in ledger row ({ledger_path.name})",
+                extra={"qa_report": True},
+            )
+            continue
+        date = str(date_cell).replace("/", "")
+        total = round(float(total_cell), 2)
+
+        try:
+            sap_id = SAP_ID(str(sap_id_cell))
+        except ParseSAPIdException:
+            log.warning(
+                f"Invalid SAP ID {sap_id_cell!r} in ledger row ({ledger_path.name})",
+                extra={"qa_report": True},
+            )
+            continue
+
+        ledger[(date, total)] = sap_id
+
+    workbook.close()
+    return ledger
+
+
+def index_statement_entries(
+    pdf_path: Path, ledger_path: Path
+) -> dict[SAP_ID, BankEntry]:
+    """Matches each bank statement transaction to its SAP ID via the
+    reconciliation ledger, keyed by (date, total). Entries with no
+    matching ledger row are logged to the QA report and skipped."""
+    ledger = read_sap_id_ledger(ledger_path)
     entries_by_sap: dict[SAP_ID, BankEntry] = {}
 
     for entry in extract_bank_entries(pdf_path):
-        try:
-            sap_id = parse_sap_id_from_string(entry.concept)
-        except ParseSAPIdException:
+        key = (entry.date, round(entry.total, 2))
+        sap_id = ledger.get(key)
+
+        if sap_id is None:
             log.warning(
-                f"No SAP ID in statement concept {entry.concept!r} ({pdf_path.name})",
+                f"No ledger match for statement entry {entry} ({pdf_path.name})",
                 extra={"qa_report": True},
             )
             continue

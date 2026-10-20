@@ -14,10 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
+from justifactu.custom_except import ParseSAPIdException
 from justifactu.defines import FileSuffix, FolderName
 from justifactu.payments import (
     index_payments,
@@ -131,6 +132,46 @@ def test_merge_pdfs_output_has_two_pages(tmp_path):
     assert len(reader.pages) == 2
 
 
+def test_merge_bills_and_payments_shared_statement_only_renamed_once(billing_dirs):
+    bills_dir, payments_dir, output_dir = billing_dirs
+
+    sap_id_a = SAP_ID("2034567890")
+    sap_id_b = SAP_ID("2034567891")
+
+    bill_a = bills_dir / f"F {sap_id_a}.pdf"
+    bill_b = bills_dir / f"F {sap_id_b}.pdf"
+    create_blank_pdf(bill_a)
+    create_blank_pdf(bill_b)
+
+    statement_pdf = payments_dir / "bank_statement.pdf"
+    create_blank_pdf(statement_pdf)
+
+    merge_bills_and_payments(
+        bills_dir,
+        payments_dir,
+        output_dir,
+        freshly_renamed_payments={sap_id_a: statement_pdf, sap_id_b: statement_pdf},
+    )
+
+    expected_a = (
+        output_dir
+        / f"{sap_id_a.year}{FolderName.YEAR_FOLDER_SUFFIX.value}"
+        / f"{sap_id_a}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+    )
+    expected_b = (
+        output_dir
+        / f"{sap_id_b.year}{FolderName.YEAR_FOLDER_SUFFIX.value}"
+        / f"{sap_id_b}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+    )
+    assert expected_a.exists()
+    assert expected_b.exists()
+
+    renamed_statement = (
+        payments_dir / f"bank_statement{FileSuffix.PROCESSED_PAYMENT.value}.pdf"
+    )
+    assert renamed_statement.exists()
+
+
 # ── cleanup_processed_files ───────────────────────────────────────────────────
 
 
@@ -161,6 +202,21 @@ def test_cleanup_processed_files_deletes_bill_when_requested(tmp_path):
     assert not bill.exists()
 
 
+def test_cleanup_processed_files_rename_payment_false_skips_rename(tmp_path):
+    bill = tmp_path / f"F {id_sap_instance}.pdf"
+    bill.touch()
+    payment = tmp_path / f"{id_sap_instance}-P.pdf"
+    payment.touch()
+
+    cleanup_processed_files(bill, payment, delete_processed=False, rename_payment=False)
+
+    renamed_payment = (
+        tmp_path / f"{id_sap_instance}-P{FileSuffix.PROCESSED_PAYMENT.value}.pdf"
+    )
+    assert not renamed_payment.exists()
+    assert payment.exists()
+
+
 # ── rename_payments ───────────────────────────────────────────────────────────
 
 
@@ -173,7 +229,7 @@ def test_rename_payments_renames_pdf(tmp_path):
     with patch(
         "justifactu.payments.parse_sap_id_from_bill", return_value=str(id_sap_instance)
     ):
-        result = rename_payments(payments_dir, tmp_path / "ledger.xslx")
+        result = rename_payments(payments_dir, tmp_path / "ledger.xlsx")
 
     renamed_pdf = payments_dir / f"{id_sap_instance}-P.pdf"
     assert renamed_pdf.exists()
@@ -188,7 +244,7 @@ def test_rename_payments_skips_already_renamed(tmp_path):
     create_blank_pdf(already_renamed)
 
     with patch("justifactu.bills.parse_sap_id_from_bill") as mock_parse:
-        rename_payments(payments_dir, tmp_path / "ledger.xslx")
+        rename_payments(payments_dir, tmp_path / "ledger.xlsx")
         mock_parse.assert_not_called()
 
 
@@ -199,8 +255,54 @@ def test_rename_payments_skips_non_pdf(tmp_path):
     txt_file.touch()
 
     with patch("justifactu.bills.parse_sap_id_from_bill") as mock_parse:
-        rename_payments(payments_dir, tmp_path / "ledger.xslx")
+        rename_payments(payments_dir, tmp_path / "ledger.xlsx")
         mock_parse.assert_not_called()
+
+
+def test_rename_payments_falls_back_to_bank_statement(tmp_path):
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
+    payments_dir.mkdir()
+    statement_pdf = payments_dir / "bank_statement.pdf"
+    create_blank_pdf(statement_pdf)
+    ledger_path = tmp_path / "ledger.xlsx"
+
+    statement_entries = {id_sap_instance: MagicMock()}
+
+    with (
+        patch(
+            "justifactu.payments.parse_sap_id_from_bill",
+            side_effect=ParseSAPIdException("no SAP ID found"),
+        ),
+        patch(
+            "justifactu.payments.index_statement_entries",
+            return_value=statement_entries,
+        ) as mock_index,
+    ):
+        result = rename_payments(payments_dir, ledger_path)
+
+    mock_index.assert_called_once_with(statement_pdf, ledger_path)
+    assert result == {id_sap_instance: statement_pdf}
+    assert statement_pdf.exists()  # not renamed - a statement isn't a single payment
+
+
+def test_rename_payments_no_statement_matches_skips_file(tmp_path):
+    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
+    payments_dir.mkdir()
+    statement_pdf = payments_dir / "bank_statement.pdf"
+    create_blank_pdf(statement_pdf)
+    ledger_path = tmp_path / "ledger.xlsx"
+
+    with (
+        patch(
+            "justifactu.payments.parse_sap_id_from_bill",
+            side_effect=ParseSAPIdException("no SAP ID found"),
+        ),
+        patch("justifactu.payments.index_statement_entries", return_value={}),
+    ):
+        result = rename_payments(payments_dir, ledger_path)
+
+    assert result == {}
+    assert statement_pdf.exists()
 
 
 # ── merge_bills_and_payments ──────────────────────────────────────────────────

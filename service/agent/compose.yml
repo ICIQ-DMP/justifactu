@@ -9,6 +9,10 @@ services:
       - ${AGENT_PORT_INTERNAL}
     environment:
       - JENKINS_AGENT_SSH_PUBKEY=${JENKINS_AGENT_SSH_PUBKEY}
+      # Overrides the SMTP_SERVER value from Vault, which is the dev-environment host —
+      # read_secret() prioritizes this env var over Vault, so this is the correct place
+      # for a per-deployment value without touching the shared Vault secret.
+      - SMTP_SERVER=${SMTP_SERVER}
     volumes:
       - justifactu-onedrive-conf:/onedrive/conf
       - justifactu-onedrive-data:/onedrive/data

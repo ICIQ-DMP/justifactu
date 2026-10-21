@@ -95,7 +95,7 @@ def main() -> None:
         run_all_phases(args.runtime_location, args.mode)
 
         bills_plus_payments_folder = merged_bills_and_payments_folder(
-            args.runtime_location, args.mode
+            args.runtime_location
         )
         qa_folder = qa_errors_folder(bills_plus_payments_folder)
         qa_folder.mkdir(parents=True, exist_ok=True)

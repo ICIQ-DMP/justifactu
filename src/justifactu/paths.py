@@ -21,22 +21,16 @@ from pathlib import Path
 from .defines import FileSuffix, FolderName, Mode
 
 
-def bills_folder(input_folder: Path, mode: Mode) -> Path:
-    if mode == Mode.PROD:
-        return input_folder / FolderName.BILLS_PROD.value
-    return input_folder / FolderName.BILLS_TEST.value
+def bills_folder(input_folder: Path) -> Path:
+    return input_folder / FolderName.BILLS.value
 
 
-def payments_folder(input_folder: Path, mode: Mode) -> Path:
-    if mode == Mode.PROD:
-        return input_folder / FolderName.PAYMENTS_PROD.value
-    return input_folder / FolderName.PAYMENTS_TEST.value
+def payments_folder(input_folder: Path) -> Path:
+    return input_folder / FolderName.PAYMENTS.value
 
 
-def merged_bills_and_payments_folder(input_folder: Path, mode: Mode) -> Path:
-    if mode == Mode.PROD:
-        return input_folder / FolderName.BILLS_AND_PAYMENTS_PROD.value
-    return input_folder / FolderName.BILLS_AND_PAYMENTS_TEST.value
+def merged_bills_and_payments_folder(input_folder: Path) -> Path:
+    return input_folder / FolderName.BILLS_AND_PAYMENTS.value
 
 
 def qa_errors_folder(merged_output_folder: Path) -> Path:
@@ -47,5 +41,6 @@ def year_merged_folder(merged_output_folder: Path, year: str) -> Path:
     return merged_output_folder / (year + FileSuffix.YEAR_FOLDER_SUFFIX.value)
 
 
-def sharepoint_sync_folder() -> Path:
-    return Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
+def sharepoint_sync_folder(mode: Mode) -> Path:
+    runtime = FolderName.RUNTIME_PROD if mode == Mode.PROD else FolderName.RUNTIME_TEST
+    return Path(FolderName.SHAREPOINT_ROOT.value) / runtime.value

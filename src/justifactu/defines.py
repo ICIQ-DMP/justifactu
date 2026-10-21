@@ -53,16 +53,12 @@ class FolderName(StrEnum):
     # Sharepoint folders
     SHAREPOINT_ROOT = "justifactu"
 
-    RUNTIME = "runtime"
+    RUNTIME_PROD = "runtime"
+    RUNTIME_TEST = "runtime-test"
 
-    BILLS_PROD = "FACTURES"
-    BILLS_TEST = "FACTURES_prova"
-
-    PAYMENTS_PROD = "Remeses"
-    PAYMENTS_TEST = "Remeses_prova"
-
-    BILLS_AND_PAYMENTS_PROD = "FACTURES+PAGAMENTS"
-    BILLS_AND_PAYMENTS_TEST = "FACTURES+PAGAMENTS_prova"
+    BILLS = "FACTURES"
+    PAYMENTS = "Remeses"
+    BILLS_AND_PAYMENTS = "FACTURES+PAGAMENTS"
 
     QA_ERRORS = "QA_ERRORS"
 

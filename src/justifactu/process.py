@@ -127,17 +127,17 @@ def mock_phase3() -> None:
     log.error("Mocking phase 3 successful! :D")
 
 
-def _phase_folders(input_folder: Path, mode: Mode) -> tuple[Path, Path, Path]:
+def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
     return (
-        bills_folder(input_folder, mode),
-        payments_folder(input_folder, mode),
-        merged_bills_and_payments_folder(input_folder, mode),
+        bills_folder(input_folder),
+        payments_folder(input_folder),
+        merged_bills_and_payments_folder(input_folder),
     )
 
 
 def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[], None]]:
     bills_folder_path, payments_folder_path, bills_plus_payments_folder = (
-        _phase_folders(input_folder, mode)
+        _phase_folders(input_folder)
     )
 
     def _run_phase_1() -> None:

@@ -26,58 +26,45 @@ from justifactu.paths import (
 )
 
 
-def test_bills_folder_prod():
-    assert (
-        bills_folder(Path("/base"), Mode.PROD)
-        == Path("/base") / FolderName.BILLS_PROD.value
-    )
+def test_bills_folder():
+    assert bills_folder(Path("/base")) == Path("/base") / FolderName.BILLS.value
 
 
-def test_bills_folder_test():
-    assert bills_folder(Path("/base"), Mode.TEST) == (
-        Path("/base") / FolderName.BILLS_TEST.value
-    )
+def test_payments_folder():
+    assert payments_folder(Path("/base")) == Path("/base") / FolderName.PAYMENTS.value
 
 
-def test_payments_folder_prod():
-    assert (
-        payments_folder(Path("/base"), Mode.PROD)
-        == Path("/base") / FolderName.PAYMENTS_PROD.value
-    )
-
-
-def test_payments_folder_test():
-    assert payments_folder(Path("/base"), Mode.TEST) == (
-        Path("/base") / FolderName.PAYMENTS_TEST.value
-    )
-
-
-def test_merged_output_folder_prod():
-    assert merged_bills_and_payments_folder(Path("/base"), Mode.PROD) == (
-        Path("/base") / FolderName.BILLS_AND_PAYMENTS_PROD.value
-    )
-
-
-def test_merged_output_folder_test():
-    assert merged_bills_and_payments_folder(Path("/base"), Mode.TEST) == (
-        Path("/base") / FolderName.BILLS_AND_PAYMENTS_TEST.value
+def test_merged_output_folder():
+    assert merged_bills_and_payments_folder(Path("/base")) == (
+        Path("/base") / FolderName.BILLS_AND_PAYMENTS.value
     )
 
 
 def test_qa_errors_folder():
-    base = Path("/base") / FolderName.BILLS_AND_PAYMENTS_PROD.value
+    base = Path("/base") / FolderName.BILLS_AND_PAYMENTS.value
     assert qa_errors_folder(base) == base / FolderName.QA_ERRORS.value
 
 
 def test_year_merged_folder():
-    base = Path("/base") / FolderName.BILLS_AND_PAYMENTS_PROD.value
+    base = Path("/base") / FolderName.BILLS_AND_PAYMENTS.value
     assert year_merged_folder(base, "2025") == base / (
         "2025" + FileSuffix.YEAR_FOLDER_SUFFIX.value
     )
 
 
-def test_sharepoint_sync_folder():
-    assert (
-        sharepoint_sync_folder()
-        == Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
+def test_sharepoint_sync_folder_prod():
+    assert sharepoint_sync_folder(Mode.PROD) == (
+        Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME_PROD.value
+    )
+
+
+def test_sharepoint_sync_folder_test():
+    assert sharepoint_sync_folder(Mode.TEST) == (
+        Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME_TEST.value
+    )
+
+
+def test_sharepoint_sync_folder_dev_uses_test_runtime():
+    assert sharepoint_sync_folder(Mode.DEV) == (
+        Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME_TEST.value
     )

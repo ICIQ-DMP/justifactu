@@ -124,7 +124,7 @@ def parse_arguments() -> argparse.Namespace:
         "--sharepoint-sync-folder",
         type=parse_directory,
         required=False,
-        default=sharepoint_sync_folder(),
+        default=None,
         help="Location for all SharePoint synced data on local.",
     )
 
@@ -172,6 +172,11 @@ def process_parse_arguments() -> argparse.Namespace:
         print("Arguments could not have been parsed. Internal error is " + e.__str__())
         print(common)
         exit(5)
+
+    if args.sharepoint_sync_folder is None:
+        args.sharepoint_sync_folder = parse_directory(
+            str(sharepoint_sync_folder(args.mode))
+        )
 
     if args.runtime_location is None:
         args.runtime_location = parse_directory(

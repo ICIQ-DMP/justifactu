@@ -341,9 +341,8 @@ breaks the agent's startup.
 
 `Jenkinsfile` (repo root) is explicitly marked **draft, not wired into any real Jenkins job** — currently a
 single-stage pipeline (`make install && make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder
-${OD_DATA} --dry-run"`, with a TODO to drop `--dry-run` once ready for real production runs), no `checkout scm`
-stage, no cron trigger, no build timeout, no `--mode` flag (so it silently runs in `Mode.TEST` — see "Path and
-folder-name composition" above). `OD_CONF`/`OD_DATA` are real, live-read environment variables (set at the
+${OD_DATA} --mode prod"`), no `checkout scm` stage, no cron trigger, no build timeout. `OD_CONF`/`OD_DATA` are
+real, live-read environment variables (set at the
 container level in `service/agent/dockerfile/Dockerfile`, consumed via `defaults.py` by `arguments.py`'s CLI-arg
 defaults). The `post` blocks call `make notify` (`notify.py`) rather than the Jenkins `emailext` step, for the
 `failure`/`aborted` notifications. Don't treat this file as a finished, production-ready pipeline.

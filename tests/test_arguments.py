@@ -152,8 +152,9 @@ def test_process_parse_arguments_requires_ledger_for_full_run(monkeypatch, tmp_p
             str(tmp_path / "sync"),
         ],
     )
-    with pytest.raises(ArgumentInputLocationError, match="--ledger-path is required"):
+    with pytest.raises(SystemExit) as exc_info:
         process_parse_arguments()
+    assert exc_info.value.code == 5
 
 
 def test_process_parse_arguments_requires_ledger_for_phase_1(monkeypatch, tmp_path):
@@ -170,8 +171,9 @@ def test_process_parse_arguments_requires_ledger_for_phase_1(monkeypatch, tmp_pa
             str(tmp_path / "sync"),
         ],
     )
-    with pytest.raises(ArgumentInputLocationError, match="--ledger-path is required"):
+    with pytest.raises(SystemExit) as exc_info:
         process_parse_arguments()
+    assert exc_info.value.code == 5
 
 
 def test_process_parse_arguments_phase_2_does_not_require_ledger(monkeypatch, tmp_path):

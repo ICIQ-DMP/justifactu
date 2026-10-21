@@ -187,20 +187,21 @@ def process_parse_arguments() -> argparse.Namespace:
     try:
         args = parse_arguments()
 
-    except argparse.ArgumentTypeError as e:
-        print("Arguments could not have been parsed. Internal error is " + e.__str__())
+        if args.runtime_location is None:
+            args.runtime_location = parse_directory(
+                str(args.onedrive_data_folder / args.sharepoint_sync_folder)
+            )
+
+        phase_needs_ledger = args.phase in (None, Phase.PHASE_1)
+        if phase_needs_ledger and args.ledger_path is None:
+            raise ArgumentInputLocationError(
+                "--ledger-path is required when running phase 1 or a full run "
+                "(no --phase specified)."
+            )
+
+    except (argparse.ArgumentTypeError, ArgumentInputLocationError) as e:
+        print("Arguments couldn't be parsed. Internal error is " + str(e))
         print(common)
         exit(5)
 
-    if args.runtime_location is None:
-        args.runtime_location = parse_directory(
-            str(args.onedrive_data_folder / args.sharepoint_sync_folder)
-        )
-
-    phase_needs_ledger = args.phase in (None, Phase.PHASE_1)
-    if phase_needs_ledger and args.ledger_path is None:
-        raise ArgumentInputLocationError(
-            "--ledger-path is required when running phase 1 or a full run "
-            "(no --phase specified)."
-        )
     return args

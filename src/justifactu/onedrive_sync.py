@@ -81,6 +81,11 @@ def _base_onedrive_args(confdir: Path, data_folder: Path) -> list[str]:
         str(confdir),
         "--syncdir",
         str(data_folder),
+        # Passed twice: a single --verbose only enables onedrive's own verboseLogging;
+        # the per-field debug lines around its config-change/--resync detection (which
+        # field it thinks changed, or whether .config.backup/.config.hash exist at
+        # check time) are gated behind debugLogging, which needs --verbose repeated.
+        "--verbose",
         "--verbose",
     ]
 

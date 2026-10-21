@@ -37,3 +37,13 @@ RUN bash install-onedrive-apt.sh
 # volume-initialization-from-image copies that ownership into the new volumes on first mount.
 RUN mkdir -p /onedrive/conf /onedrive/data /onedrive/logs && \
     chown -R jenkins:jenkins /onedrive
+
+# onedrive's own config-change/--resync detection (src/config.d, applicationChangeWhereResyncRequired)
+# treats --syncdir differing from the confdir's own config.sync_dir as a real, resync-worthy change
+# UNLESS it detects /entrypoint.sh at the filesystem root (its heuristic for "this is a container
+# where sync_dir is always CLI/env-overridden, so don't flag that"). We always pass --syncdir, and
+# this image is built from jenkins/ssh-agent + apt-installed onedrive rather than abraunegg's own
+# Docker image (which ships that file), so without it every run spuriously demands a --resync via
+# "sync_dir: CLI override of config file option, --resync needed". The file's content is never read,
+# only its existence is checked, so an empty marker is sufficient.
+RUN touch /entrypoint.sh

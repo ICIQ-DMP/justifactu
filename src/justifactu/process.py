@@ -144,11 +144,13 @@ def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[],
         rename_payments(payments_folder_path)
 
     def _run_phase_2() -> None:
+        # Bills are deleted after a successful merge in PROD and TEST, but kept in DEV
+        # so local test fixtures survive repeated runs.
         merge_bills_and_payments(
             bills_folder_path,
             payments_folder_path,
             bills_plus_payments_folder,
-            delete_processed=True,
+            delete_processed=mode != Mode.DEV,
         )
 
     return {

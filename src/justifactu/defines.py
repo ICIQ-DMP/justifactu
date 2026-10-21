@@ -44,6 +44,7 @@ class Mode(StrEnum):
 
     PROD = "prod"
     TEST = "test"
+    DEV = "dev"
 
 
 class FolderName(StrEnum):

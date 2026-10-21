@@ -37,6 +37,10 @@ def qa_errors_folder(merged_output_folder: Path) -> Path:
     return merged_output_folder / FolderName.QA_ERRORS.value
 
 
+def logs_folder(merged_output_folder: Path) -> Path:
+    return merged_output_folder / FolderName.LOGS.value
+
+
 def year_merged_folder(merged_output_folder: Path, year: str) -> Path:
     return merged_output_folder / (year + FileSuffix.YEAR_FOLDER_SUFFIX.value)
 

@@ -26,7 +26,11 @@ from justifactu.defines import (
     SyncDirection,
     InputLocation,
 )
-from justifactu.paths import merged_bills_and_payments_folder, qa_errors_folder
+from justifactu.paths import (
+    logs_folder,
+    merged_bills_and_payments_folder,
+    qa_errors_folder,
+)
 from justifactu.logger import (
     LOGS_FOLDER,
     configure_logging_from_settings,
@@ -100,8 +104,11 @@ def main() -> None:
         qa_folder = qa_errors_folder(bills_plus_payments_folder)
         qa_folder.mkdir(parents=True, exist_ok=True)
         copy_file(qa_report_path, qa_folder)
+
+        regular_logs_folder = logs_folder(bills_plus_payments_folder)
+        regular_logs_folder.mkdir(parents=True, exist_ok=True)
         regular_log_path = LOGS_FOLDER / (NOW + ".log")
-        copy_file(regular_log_path, qa_folder)
+        copy_file(regular_log_path, regular_logs_folder)
 
         run_onedrive_sync(
             confdir,

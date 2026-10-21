@@ -79,7 +79,10 @@ def merge_bills_and_payments(
         matched_payment: Path | None = payment_map.get(sap)
 
         if not matched_payment:
-            log.error(f"No matching payment found for bill {bill_path}")
+            log.error(
+                f"No matching payment found for bill {bill_path}",
+                extra={"qa_report": True},
+            )
             continue
 
         output_folder_path = year_merged_folder(merge_folder, sap.year)

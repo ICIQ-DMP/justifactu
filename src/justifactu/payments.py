@@ -36,7 +36,10 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
     for filename, payment_path in folder_map.items():
 
         if payment_path.suffix.lower() != ".pdf":
-            log.warning(f"Skipping {payment_path} because it is not a PDF")
+            log.warning(
+                f"Skipping {payment_path} because it is not a PDF",
+                extra={"qa_report": True},
+            )
             continue
 
         if payment_path.stem.endswith(FileSuffix.PROCESSED_PAYMENT.value):
@@ -75,7 +78,9 @@ def rename_payments(
             continue
 
         if entry.suffix.lower() != ".pdf":
-            log.warning(f"Skipping file {entry}: non-PDF file")
+            log.warning(
+                f"Skipping file {entry}: non-PDF file", extra={"qa_report": True}
+            )
             continue
 
         try:
@@ -86,6 +91,6 @@ def rename_payments(
             renamed_this_run[SAP_ID(sap_id)] = renamed_path
 
         except (ParseSAPIdException, FileNotFoundError) as e:
-            log.error(f"Failed to rename {entry}: {e}")
+            log.error(f"Failed to rename {entry}: {e}", extra={"qa_report": True})
 
     return renamed_this_run

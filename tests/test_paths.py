@@ -21,6 +21,7 @@ from justifactu.paths import (
     payments_folder,
     merged_bills_and_payments_folder,
     qa_errors_folder,
+    logs_folder,
     year_merged_folder,
     sharepoint_sync_folder,
 )
@@ -43,6 +44,11 @@ def test_merged_output_folder():
 def test_qa_errors_folder():
     base = Path("/base") / FolderName.BILLS_AND_PAYMENTS.value
     assert qa_errors_folder(base) == base / FolderName.QA_ERRORS.value
+
+
+def test_logs_folder():
+    base = Path("/base") / FolderName.BILLS_AND_PAYMENTS.value
+    assert logs_folder(base) == base / FolderName.LOGS.value
 
 
 def test_year_merged_folder():

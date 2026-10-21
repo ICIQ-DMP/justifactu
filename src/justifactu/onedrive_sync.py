@@ -66,6 +66,13 @@ def _write_drive_id_if_missing(confdir: Path) -> None:
     config_path.write_text("\n".join(new_lines) + "\n")
 
 
+# onedrive's own app-specific exit code for "the config differs from the last run's
+# .config.backup (or no backup exists yet) and a --resync is required before it will sync".
+# Hit on the first real sync after a fresh --auth bootstrap, since run_onedrive_auth never
+# invokes the sync engine and so never writes that backup.
+_RESYNC_REQUIRED_EXIT_CODE = 126
+
+
 def _base_onedrive_args(confdir: Path, data_folder: Path) -> list[str]:
     """Flags shared by every sync invocation (download/upload)."""
     return [
@@ -102,7 +109,16 @@ def run_onedrive_sync(
         if dry_run:
             args_list.append("--dry-run")
 
-        subprocess.run(args_list, check=True)
+        try:
+            subprocess.run(args_list, check=True)
+        except subprocess.CalledProcessError as e:
+            if e.returncode != _RESYNC_REQUIRED_EXIT_CODE:
+                raise
+            log.warning(
+                "OneDrive requires a --resync (no matching .config.backup found); "
+                "retrying once with --resync --resync-auth."
+            )
+            subprocess.run(args_list + ["--resync", "--resync-auth"], check=True)
         log.info(f"OneDrive {direction} sync complete.")
     except subprocess.CalledProcessError as e:
         raise MainCriticalError(

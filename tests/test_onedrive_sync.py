@@ -98,6 +98,30 @@ def test_run_onedrive_sync_succeeds_without_resync(tmp_path):
     assert "--resync" not in mock_run.call_args[0][0]
 
 
+def test_run_onedrive_sync_retries_once_with_resync_on_126(tmp_path):
+    confdir = _confdir(tmp_path)
+    (confdir / "config").write_text('drive_id = "already-there"\n')
+
+    with patch(
+        "justifactu.onedrive_sync.subprocess.run",
+        side_effect=[
+            subprocess.CalledProcessError(126, "onedrive"),
+            None,
+        ],
+    ) as mock_run:
+        run_onedrive_sync(
+            confdir,
+            direction="download",
+            single_dir=Path("justifactu/runtime"),
+            data_folder=tmp_path / "data",
+        )
+
+    assert mock_run.call_count == 2
+    retry_args = mock_run.call_args_list[1][0][0]
+    assert "--resync" in retry_args
+    assert "--resync-auth" in retry_args
+
+
 def test_run_onedrive_sync_does_not_retry_on_other_failures(tmp_path):
     confdir = _confdir(tmp_path)
     (confdir / "config").write_text('drive_id = "already-there"\n')

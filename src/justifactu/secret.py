@@ -37,19 +37,27 @@ def read_secret(secret_name: str) -> str:
       3. Environment variable
       4. HashiCorp Vault  (https://{VAULT_ADDR}, policy justicier-runtime)
     """
-    sources: list[Callable[[], str]] = [
-        lambda: read_file_content(Path("/run/secrets") / secret_name),
-        lambda: read_file_content(default_secrets_folder() / secret_name),
-        lambda: read_env_var(secret_name),
-        lambda: read_vault_secret(secret_name),
+    sources: list[tuple[str, Callable[[], str]]] = [
+        (
+            "docker secret",
+            lambda: read_file_content(Path("/run/secrets") / secret_name),
+        ),
+        (
+            "local secrets file",
+            lambda: read_file_content(default_secrets_folder() / secret_name),
+        ),
+        ("environment variable", lambda: read_env_var(secret_name)),
+        ("vault", lambda: read_vault_secret(secret_name)),
     ]
 
-    for source in sources:
+    failures: list[str] = []
+    for source_name, source in sources:
         try:
             return source()
         except Exception as e:
-            log.trace(f"Failed to read secret {str(e)}")
+            log.debug(f"Could not read {secret_name} from {source_name}: {e}")
+            failures.append(f"{source_name}: {e}")
             continue
 
-    log.error(f"Could not read {secret_name} from any source")
+    log.error(f"Could not read {secret_name} from any source — " + "; ".join(failures))
     raise SecretCouldNotBeReadFromAnySourceError

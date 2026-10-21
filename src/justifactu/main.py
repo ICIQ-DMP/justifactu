@@ -119,7 +119,7 @@ def main() -> None:
     finally:
         try:
             send_qa_report_mail(
-                to_email=read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
+                to_email=read_secret(SecretNames.SMTP_OWNER_EMAIL.value),
                 message="Adjuntem el informe QA de l'execució.",
                 qa_report_path=qa_report_path,
                 additional_attachments=[get_user_log_path()],

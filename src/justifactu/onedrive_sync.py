@@ -106,6 +106,10 @@ def run_onedrive_sync(
         ]
         if direction == "download":
             args_list.append("--cleanup-local-files")
+        # No equivalent flag needed for "upload": onedrive already deletes remote
+        # files that no longer exist locally on --upload-only by default (its
+        # no_remote_delete setting defaults to false) — --no-remote-delete is the
+        # opt-OUT flag, so simply not passing it keeps that cleanup behavior on.
         if dry_run:
             args_list.append("--dry-run")
 

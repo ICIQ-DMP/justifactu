@@ -20,7 +20,11 @@ from unittest.mock import patch
 import pytest
 
 from justifactu.custom_except import MainCriticalError
-from justifactu.onedrive_sync import run_onedrive_sync
+from justifactu.onedrive_sync import (
+    _drive_id_present,
+    _write_drive_id_if_missing,
+    run_onedrive_sync,
+)
 
 
 def _confdir(tmp_path: Path) -> Path:
@@ -29,10 +33,60 @@ def _confdir(tmp_path: Path) -> Path:
     return confdir
 
 
-def test_run_onedrive_sync_succeeds_without_resync(tmp_path):
+# ── _drive_id_present ───────────────────────────────────────────────────────
+
+
+def test_drive_id_present_false_when_config_missing(tmp_path):
+    confdir = _confdir(tmp_path)
+    assert _drive_id_present(confdir) is False
+
+
+def test_drive_id_present_false_when_blank(tmp_path):
+    confdir = _confdir(tmp_path)
+    (confdir / "config").write_text('drive_id = ""\n')
+    assert _drive_id_present(confdir) is False
+
+
+def test_drive_id_present_true_when_set(tmp_path):
+    confdir = _confdir(tmp_path)
+    (confdir / "config").write_text('drive_id = "abc123"\n')
+    assert _drive_id_present(confdir) is True
+
+
+# ── _write_drive_id_if_missing ──────────────────────────────────────────────
+
+
+def test_write_drive_id_if_missing_writes_when_absent(tmp_path):
     confdir = _confdir(tmp_path)
 
-    with (patch("justifactu.onedrive_sync.subprocess.run") as mock_run,):
+    with patch(
+        "justifactu.onedrive_sync.read_secret", return_value="real-drive-id"
+    ) as mock_secret:
+        _write_drive_id_if_missing(confdir)
+
+    mock_secret.assert_called_once()
+    assert 'drive_id = "real-drive-id"' in (confdir / "config").read_text()
+
+
+def test_write_drive_id_if_missing_is_noop_when_present(tmp_path):
+    confdir = _confdir(tmp_path)
+    (confdir / "config").write_text('drive_id = "already-there"\n')
+
+    with patch("justifactu.onedrive_sync.read_secret") as mock_secret:
+        _write_drive_id_if_missing(confdir)
+
+    mock_secret.assert_not_called()
+    assert (confdir / "config").read_text() == 'drive_id = "already-there"\n'
+
+
+# ── run_onedrive_sync ────────────────────────────────────────────────────────
+
+
+def test_run_onedrive_sync_succeeds_without_resync(tmp_path):
+    confdir = _confdir(tmp_path)
+    (confdir / "config").write_text('drive_id = "already-there"\n')
+
+    with patch("justifactu.onedrive_sync.subprocess.run") as mock_run:
         run_onedrive_sync(
             confdir,
             direction="download",
@@ -46,6 +100,7 @@ def test_run_onedrive_sync_succeeds_without_resync(tmp_path):
 
 def test_run_onedrive_sync_does_not_retry_on_other_failures(tmp_path):
     confdir = _confdir(tmp_path)
+    (confdir / "config").write_text('drive_id = "already-there"\n')
 
     with (
         patch(

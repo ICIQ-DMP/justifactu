@@ -19,8 +19,51 @@ from pathlib import Path
 
 from .custom_except import MainCriticalError
 from .logger import get_logger
+from .defines import SecretNames
+from .secret import read_secret
 
 log = get_logger(__name__)
+
+
+def _drive_id_present(confdir: Path) -> bool:
+    """Whether the config file already has a non-empty drive_id value."""
+    config_path = confdir / "config"
+    if not config_path.exists():
+        return False
+    for line in config_path.read_text().splitlines():
+        stripped = line.strip()
+        if stripped.startswith("drive_id"):
+            _, _, value = stripped.partition("=")
+            return value.strip().strip('"') != ""
+    return False
+
+
+def _write_drive_id_if_missing(confdir: Path) -> None:
+    """Writes the drive_id secret into the onedrive config file, but only
+    the first time — if a non-empty drive_id is already there, this is a
+    no-op. Unlike the old write-then-erase-every-call approach, the value
+    now persists once written, so the config file's content stays stable
+    across runs instead of churning on every invocation — churn that used
+    to make onedrive's own .config.backup change-detection think the
+    config had been edited and demand a --resync."""
+    if _drive_id_present(confdir):
+        return
+
+    config_path = confdir / "config"
+    config_path.touch(exist_ok=True)
+    lines = config_path.read_text().splitlines()
+    drive_id = read_secret(SecretNames.DRIVE_ID.value)
+    new_lines = []
+    found = False
+    for line in lines:
+        if line.strip().startswith("drive_id"):
+            new_lines.append(f'drive_id = "{drive_id}"')
+            found = True
+        else:
+            new_lines.append(line)
+    if not found:
+        new_lines.append(f'drive_id = "{drive_id}"')
+    config_path.write_text("\n".join(new_lines) + "\n")
 
 
 def _base_onedrive_args(confdir: Path, data_folder: Path) -> list[str]:
@@ -45,6 +88,8 @@ def run_onedrive_sync(
     """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits."""
     log.info(f"Starting onedrive {direction} sync...")
     try:
+        _write_drive_id_if_missing(confdir)
+
         args_list = _base_onedrive_args(confdir, data_folder)
         args_list += [
             "--sync",
@@ -76,6 +121,8 @@ def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
     """
     log.info("Starting onedrive authentication...")
     try:
+        _write_drive_id_if_missing(confdir)
+
         args_list = _base_onedrive_args(confdir, data_folder)
 
         subprocess.run(args_list, check=True)

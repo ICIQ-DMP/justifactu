@@ -15,15 +15,40 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 from unittest.mock import MagicMock, patch
 
+from pathlib import Path
+
+import openpyxl
+
 from justifactu.bank_statement import (
     BankEntry,
     _group_into_rows,
     _parse_amount,
     extract_bank_entries,
+    index_statement_entries,
+    read_sap_id_ledger,
     Word,
 )
+from justifactu.SAP_ID import SAP_ID
 
 sap_id = "2034567890"
+
+
+def _write_ledger_row(sheet, date="", concept="", total="", sap_id="") -> None:
+    row = [None] * 10
+    row[0] = date
+    row[3] = concept
+    row[7] = total
+    row[9] = sap_id
+    sheet.append(row)
+
+
+def _make_ledger(path: Path, rows: list[dict]) -> None:
+    workbook = openpyxl.Workbook()
+    sheet = workbook.active
+    sheet.append(["header"] * 10)  # row 1 - skipped by read_sap_id_ledger's min_row=2
+    for row in rows:
+        _write_ledger_row(sheet, **row)
+    workbook.save(path)
 
 
 # ── _parse_amount ─────────────────────────────────────────────────────────────
@@ -185,3 +210,155 @@ def test_extract_bank_entries_combines_multiple_pages(tmp_path):
         BankEntry(date="0101", concept="Compra", total=56.78),
         BankEntry(date="0202", concept="Taxi", total=82.99),
     ]
+
+
+# ── read_sap_id_ledger ───────────────────────────────────────────────────────
+
+
+def test_read_sap_id_ledger_maps_date_total_to_sap_id(tmp_path):
+    ledger_path = tmp_path / "ledger.xlsx"
+    _make_ledger(
+        ledger_path,
+        [{"date": "01/01", "concept": "Compra", "total": 56.78, "sap_id": sap_id}],
+    )
+
+    result = read_sap_id_ledger(ledger_path)
+
+    assert result == {("0101", 56.78): SAP_ID(sap_id)}
+
+
+def test_read_sap_id_ledger_skips_row_without_sap_id(tmp_path):
+    ledger_path = tmp_path / "ledger.xlsx"
+    _make_ledger(
+        ledger_path,
+        [{"date": "01/01", "concept": "Compra", "total": 56.78, "sap_id": None}],
+    )
+
+    result = read_sap_id_ledger(ledger_path)
+
+    assert result == {}
+
+
+def test_read_sap_id_ledger_skips_non_numeric_total(tmp_path):
+    ledger_path = tmp_path / "ledger.xlsx"
+    _make_ledger(
+        ledger_path,
+        [{"date": "01/01", "concept": "Compra", "total": "N/A", "sap_id": sap_id}],
+    )
+
+    result = read_sap_id_ledger(ledger_path)
+
+    assert result == {}
+
+
+def test_read_sap_id_ledger_skips_invalid_sap_id(tmp_path):
+    ledger_path = tmp_path / "ledger.xlsx"
+    _make_ledger(
+        ledger_path,
+        [
+            {
+                "date": "01/01",
+                "concept": "Compra",
+                "total": 56.78,
+                "sap_id": "not-a-sap-id",
+            }
+        ],
+    )
+
+    result = read_sap_id_ledger(ledger_path)
+
+    assert result == {}
+
+
+def test_read_sap_id_ledger_multiple_rows(tmp_path):
+    ledger_path = tmp_path / "ledger.xlsx"
+    sap_id_a = SAP_ID("2034567890")
+    sap_id_b = SAP_ID("2034567891")
+    _make_ledger(
+        ledger_path,
+        [
+            {
+                "date": "01/01",
+                "concept": "Compra",
+                "total": 56.78,
+                "sap_id": str(sap_id_a),
+            },
+            {
+                "date": "02/02",
+                "concept": "Taxi",
+                "total": 12.34,
+                "sap_id": str(sap_id_b),
+            },
+        ],
+    )
+
+    result = read_sap_id_ledger(ledger_path)
+
+    assert result == {
+        ("0101", 56.78): sap_id_a,
+        ("0202", 12.34): sap_id_b,
+    }
+
+
+# ── index_statement_entries ───────────────────────────────────────────────────────
+
+
+def test_index_statement_entries_matches_by_date_and_total(tmp_path):
+    pdf_path = tmp_path / "statement.pdf"
+    ledger_path = tmp_path / "ledger.xlsx"
+    entry = BankEntry(date="0101", concept="Compra", total=56.78)
+    sap_id_instance = SAP_ID(sap_id)
+
+    with (
+        patch("justifactu.bank_statement.extract_bank_entries", return_value=[entry]),
+        patch(
+            "justifactu.bank_statement.read_sap_id_ledger",
+            return_value={("0101", 56.78): sap_id_instance},
+        ),
+    ):
+        result = index_statement_entries(pdf_path, ledger_path)
+
+    assert result == {sap_id_instance: entry}
+
+
+def test_index_statement_entries_skips_unmatched_entry(tmp_path):
+    pdf_path = tmp_path / "statement.pdf"
+    ledger_path = tmp_path / "ledger.xlsx"
+    entry = BankEntry(date="0101", concept="Compra", total=56.78)
+
+    with (
+        patch("justifactu.bank_statement.extract_bank_entries", return_value=[entry]),
+        patch(
+            "justifactu.bank_statement.read_sap_id_ledger",
+            return_value={("0202", 12.34): SAP_ID(sap_id)},
+        ),
+    ):
+        result = index_statement_entries(pdf_path, ledger_path)
+
+    assert result == {}
+
+
+def test_index_statement_entries_multiple_entries(tmp_path):
+    pdf_path = tmp_path / "statement.pdf"
+    ledger_path = tmp_path / "ledger.xlsx"
+    entry_a = BankEntry(date="0101", concept="Compra", total=56.78)
+    entry_b = BankEntry(date="0202", concept="Taxi", total=12.34)
+    sap_id_a = SAP_ID("2034567890")
+    sap_id_b = SAP_ID("2034567891")
+
+    with (
+        patch(
+            "justifactu.bank_statement.extract_bank_entries",
+            return_value=[entry_a, entry_b],
+        ),
+        patch(
+            "justifactu.bank_statement.read_sap_id_ledger",
+            return_value={
+                ("0101", 56.78): sap_id_a,
+                ("0202", 12.34): sap_id_b,
+            },
+        ),
+    ):
+        result = index_statement_entries(pdf_path, ledger_path)
+
+    assert result == {sap_id_a: entry_a, sap_id_b: entry_b}

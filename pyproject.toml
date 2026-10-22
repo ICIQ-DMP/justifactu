@@ -11,7 +11,7 @@ dependencies = [
     "rich",
     "requests",
     "pdfplumber",
-    "types-openpyxl",
+    "openpyxl",
 ]
 
 
@@ -25,7 +25,8 @@ dev = [
   "pytest",
   "mypy",
   "ruff",
-  "pre-commit"
+  "pre-commit",
+  "types-openpyxl",
 ]
 
 [tool.semantic_release]

@@ -30,6 +30,7 @@ log = get_logger(__name__)
 DATE_PATTERN = re.compile(r"^\d{4}$")
 AMOUNT_PATTERN = re.compile(r"^\d{1,3}(?:\.\d{3})*,\d{2}$")
 CONCEPT_COLUMN_END_X = 289  # next column (location/reference/etc.) starts here
+COMMISSION_MARKER = "Comissió per conversió de divises"
 
 
 class Word(TypedDict):
@@ -45,6 +46,30 @@ class BankEntry:
     date: str  # DDMM
     concept: str
     total: float
+
+
+def _merge_commission_rows(entries: list[BankEntry]) -> list[BankEntry]:
+    """Folds a currency-exchange commission row into the immediately
+    preceding transaction row (same date) - the ledger records their
+    combined total as a single entry, not two."""
+    merged: list[BankEntry] = []
+    for entry in entries:
+        if (
+            entry.concept.startswith(COMMISSION_MARKER)
+            and merged
+            and merged[-1].date == entry.date
+        ):
+            previous = merged.pop()
+            merged.append(
+                BankEntry(
+                    date=previous.date,
+                    concept=previous.concept,
+                    total=round(previous.total + entry.total, 2),
+                )
+            )
+        else:
+            merged.append(entry)
+    return merged
 
 
 def _group_into_rows(words: list[Word], tolerance: float = 1.0) -> list[list[Word]]:
@@ -97,7 +122,7 @@ def extract_bank_entries(pdf_path: Path) -> list[BankEntry]:
                 total = _parse_amount(amount_words[-1])
 
                 entries.append(BankEntry(date=date, concept=concept, total=total))
-    return entries
+    return _merge_commission_rows(entries)
 
 
 def read_sap_id_ledger(ledger_path: Path) -> dict[tuple[str, float], SAP_ID]:
@@ -123,7 +148,7 @@ def read_sap_id_ledger(ledger_path: Path) -> dict[tuple[str, float], SAP_ID]:
                 extra={"qa_report": True},
             )
             continue
-        date = str(date_cell).replace("/", "")
+        date = str(date_cell).strip().lstrip("'").replace("/", "")
         total = round(float(total_cell), 2)
 
         try:

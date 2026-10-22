@@ -27,6 +27,7 @@ from justifactu.bank_statement import (
     index_statement_entries,
     read_sap_id_ledger,
     Word,
+    _merge_commission_rows,
 )
 from justifactu.SAP_ID import SAP_ID
 
@@ -362,3 +363,37 @@ def test_index_statement_entries_multiple_entries(tmp_path):
         result = index_statement_entries(pdf_path, ledger_path)
 
     assert result == {sap_id_a: entry_a, sap_id_b: entry_b}
+
+
+# ── _merge_commission_rows ────────────────────────────────────────────────
+
+
+def test_merge_commission_rows_merges_matching_commission():
+    main_entry = BankEntry(date="0105", concept="AAA", total=12.34)
+    commission_entry = BankEntry(
+        date="0105", concept="Comissió per conversió de divises (*)", total=1.0
+    )
+
+    result = _merge_commission_rows([main_entry, commission_entry])
+
+    assert result == [BankEntry(date="0105", concept="AAA", total=13.34)]
+
+
+def test_merge_commission_rows_leaves_normal_rows_untouched():
+    entry_a = BankEntry(date="0101", concept="Compra", total=56.78)
+    entry_b = BankEntry(date="0202", concept="Taxi", total=12.34)
+
+    result = _merge_commission_rows([entry_a, entry_b])
+
+    assert result == [entry_a, entry_b]
+
+
+def test_merge_commission_rows_does_not_merge_across_different_dates():
+    entry_a = BankEntry(date="0101", concept="Compra", total=56.78)
+    commission_entry = BankEntry(
+        date="0202", concept="Comissió per conversió de divises (*)", total=1.0
+    )
+
+    result = _merge_commission_rows([entry_a, commission_entry])
+
+    assert result == [entry_a, commission_entry]

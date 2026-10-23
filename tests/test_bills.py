@@ -18,6 +18,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from pypdf.errors import DependencyError
+
 from justifactu.bills import parse_sap_id_from_bill
 from justifactu.custom_except import ParseSAPIdException
 
@@ -68,6 +70,22 @@ def test_parse_sap_id_from_bill_not_found_raises(tmp_path):
 
     with patch("justifactu.bills.PdfReader", return_value=mock_reader):
         with pytest.raises(ParseSAPIdException, match="No SAP ID found"):
+            parse_sap_id_from_bill(pdf_path)
+
+
+def test_parse_sap_id_from_bill_wraps_pypdf_errors(tmp_path):
+    pdf_path = tmp_path / "bill.pdf"
+    pdf_path.touch()
+
+    mock_page = MagicMock()
+    mock_page.extract_text.side_effect = DependencyError(
+        "cryptography>=3.1 is required for AES algorithm"
+    )
+    mock_reader = MagicMock()
+    mock_reader.pages = [mock_page]
+
+    with patch("justifactu.bills.PdfReader", return_value=mock_reader):
+        with pytest.raises(ParseSAPIdException, match="Could not read"):
             parse_sap_id_from_bill(pdf_path)
 
 

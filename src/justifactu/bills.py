@@ -17,6 +17,7 @@ import re
 from pathlib import Path
 
 from pypdf import PdfReader
+from pypdf.errors import DependencyError, PyPdfError
 from .SAP_ID import pattern as SAP_pattern
 
 from .SAP_ID import SAP_ID
@@ -47,18 +48,21 @@ def parse_sap_id_from_bill(pdf_path: Path) -> str:
 
     pattern = re.compile(query_str, re.MULTILINE)
 
-    reader = PdfReader(pdf_path)
+    try:
+        reader = PdfReader(pdf_path)
 
-    for page in reader.pages:
-        text = page.extract_text()
-        if not text:
-            continue
+        for page in reader.pages:
+            text = page.extract_text()
+            if not text:
+                continue
 
-        match = pattern.search(text)
+            match = pattern.search(text)
 
-        if not match:
-            continue
+            if not match:
+                continue
 
-        return match.group("year") + match.group("sapid")
+            return match.group("year") + match.group("sapid")
+    except (PyPdfError, DependencyError) as e:
+        raise ParseSAPIdException(f"Could not read {pdf_path}: {e}") from e
 
     raise ParseSAPIdException(f"No SAP ID found in {pdf_path}")

@@ -8,6 +8,7 @@ authors = [{name="AleixMT"}, {name="DavidRomeroICIQ"}]
 license = {text="GPL-3.0-or-later"}
 dependencies = [
     "pypdf",
+    "cryptography",
     "rich",
     "requests",
 ]

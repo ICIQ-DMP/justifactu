@@ -65,6 +65,7 @@ def main() -> None:
         run_onedrive_auth(
             confdir,
             data_folder=args.onedrive_data_folder,
+            mode=args.mode,
         )
         return
 
@@ -75,6 +76,7 @@ def main() -> None:
                 direction=SyncDirection.DOWNLOAD.value,
                 single_dir=args.sharepoint_sync_folder,
                 data_folder=args.onedrive_data_folder,
+                mode=args.mode,
                 dry_run=args.dry_run,
             )
         except MainCriticalError as e:
@@ -115,6 +117,7 @@ def main() -> None:
             direction=SyncDirection.UPLOAD.value,
             single_dir=args.sharepoint_sync_folder,
             data_folder=args.onedrive_data_folder,
+            mode=args.mode,
             dry_run=args.dry_run,
         )
         log.info("Finished...")

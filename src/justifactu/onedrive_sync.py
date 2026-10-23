@@ -19,7 +19,7 @@ from pathlib import Path
 
 from .custom_except import MainCriticalError
 from .logger import get_logger
-from .defines import SecretNames
+from .defines import Mode, SecretNames
 from .secret import read_secret
 
 log = get_logger(__name__)
@@ -73,21 +73,23 @@ def _write_drive_id_if_missing(confdir: Path) -> None:
 _RESYNC_REQUIRED_EXIT_CODE = 126
 
 
-def _base_onedrive_args(confdir: Path, data_folder: Path) -> list[str]:
+def _base_onedrive_args(confdir: Path, data_folder: Path, mode: Mode) -> list[str]:
     """Flags shared by every sync invocation (download/upload)."""
-    return [
+    args_list = [
         "onedrive",
         "--confdir",
         str(confdir),
         "--syncdir",
         str(data_folder),
+    ]
+    if mode != Mode.PROD:
         # Passed twice: a single --verbose only enables onedrive's own verboseLogging;
         # the per-field debug lines around its config-change/--resync detection (which
         # field it thinks changed, or whether .config.backup/.config.hash exist at
         # check time) are gated behind debugLogging, which needs --verbose repeated.
-        "--verbose",
-        "--verbose",
-    ]
+        # Left out in PROD so logs don't grow unbounded on real runs.
+        args_list += ["--verbose", "--verbose"]
+    return args_list
 
 
 def run_onedrive_sync(
@@ -95,6 +97,7 @@ def run_onedrive_sync(
     direction: str,
     single_dir: Path,
     data_folder: Path,
+    mode: Mode,
     dry_run: bool = False,
 ) -> None:
     """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits."""
@@ -102,7 +105,7 @@ def run_onedrive_sync(
     try:
         _write_drive_id_if_missing(confdir)
 
-        args_list = _base_onedrive_args(confdir, data_folder)
+        args_list = _base_onedrive_args(confdir, data_folder, mode)
         args_list += [
             "--sync",
             f"--{direction}-only",
@@ -137,7 +140,7 @@ def run_onedrive_sync(
         raise MainCriticalError("onedrive binary not found on PATH") from e
 
 
-def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
+def run_onedrive_auth(confdir: Path, data_folder: Path, mode: Mode) -> None:
     """Runs a one-shot OneDrive-for-Linux authentication pass.
 
     No --single-directory, no --sync/--monitor: on a confdir with no
@@ -148,7 +151,7 @@ def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
     try:
         _write_drive_id_if_missing(confdir)
 
-        args_list = _base_onedrive_args(confdir, data_folder)
+        args_list = _base_onedrive_args(confdir, data_folder, mode)
 
         subprocess.run(args_list, check=True)
         log.info("OneDrive authentication complete.")

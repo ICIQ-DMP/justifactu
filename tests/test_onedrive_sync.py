@@ -20,7 +20,9 @@ from unittest.mock import patch
 import pytest
 
 from justifactu.custom_except import MainCriticalError
+from justifactu.defines import Mode
 from justifactu.onedrive_sync import (
+    _base_onedrive_args,
     _drive_id_present,
     _write_drive_id_if_missing,
     run_onedrive_sync,
@@ -79,6 +81,20 @@ def test_write_drive_id_if_missing_is_noop_when_present(tmp_path):
     assert (confdir / "config").read_text() == 'drive_id = "already-there"\n'
 
 
+# ── _base_onedrive_args ──────────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize("mode", [Mode.TEST, Mode.DEV])
+def test_base_onedrive_args_includes_double_verbose_outside_prod(tmp_path, mode):
+    args_list = _base_onedrive_args(tmp_path / "conf", tmp_path / "data", mode)
+    assert args_list.count("--verbose") == 2
+
+
+def test_base_onedrive_args_excludes_verbose_in_prod(tmp_path):
+    args_list = _base_onedrive_args(tmp_path / "conf", tmp_path / "data", Mode.PROD)
+    assert "--verbose" not in args_list
+
+
 # ── run_onedrive_sync ────────────────────────────────────────────────────────
 
 
@@ -92,6 +108,7 @@ def test_run_onedrive_sync_succeeds_without_resync(tmp_path):
             direction="download",
             single_dir=Path("justifactu/runtime"),
             data_folder=tmp_path / "data",
+            mode=Mode.TEST,
         )
 
     mock_run.assert_called_once()
@@ -114,6 +131,7 @@ def test_run_onedrive_sync_retries_once_with_resync_on_126(tmp_path):
             direction="download",
             single_dir=Path("justifactu/runtime"),
             data_folder=tmp_path / "data",
+            mode=Mode.TEST,
         )
 
     assert mock_run.call_count == 2
@@ -138,6 +156,7 @@ def test_run_onedrive_sync_does_not_retry_on_other_failures(tmp_path):
             direction="download",
             single_dir=Path("justifactu/runtime"),
             data_folder=tmp_path / "data",
+            mode=Mode.TEST,
         )
 
     mock_run.assert_called_once()

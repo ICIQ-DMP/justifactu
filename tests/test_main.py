@@ -29,6 +29,7 @@ def _auth_args(tmp_path: Path) -> argparse.Namespace:
         onedrive_conf_folder=tmp_path / "conf",
         onedrive_data_folder=tmp_path / "data",
         dry_run=False,
+        mode=Mode.TEST,
     )
 
 
@@ -56,7 +57,9 @@ def test_auth_branch_calls_run_onedrive_auth_and_exits_before_phases(tmp_path):
         main()
 
     mock_auth.assert_called_once_with(
-        args.onedrive_conf_folder, data_folder=args.onedrive_data_folder
+        args.onedrive_conf_folder,
+        data_folder=args.onedrive_data_folder,
+        mode=args.mode,
     )
     mock_parse.assert_called_once()
     mock_sync.assert_not_called()

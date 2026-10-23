@@ -20,7 +20,10 @@ from .SAP_ID import SAP_ID, parse_sap_id_from_string
 from .filesystem import change_file_name
 from .logger import get_logger
 
-from .bills import parse_sap_id_from_bill
+
+from pypdf import PdfReader
+from pypdf.errors import DependencyError, PyPdfError
+
 from .custom_except import (
     ParseSAPIdException,
 )
@@ -86,7 +89,7 @@ def rename_payments(
         try:
             log.info(f"Renaming: {entry.name}...")
 
-            sap_id = parse_sap_id_from_bill(entry)
+            sap_id = parse_sap_id_from_payment(entry)
             renamed_path = change_file_name(entry, f"{sap_id}-P")
             renamed_this_run[SAP_ID(sap_id)] = renamed_path
 
@@ -94,3 +97,29 @@ def rename_payments(
             log.error(f"Failed to rename {entry}: {e}", extra={"qa_report": True})
 
     return renamed_this_run
+
+
+def parse_sap_id_from_payment(pdf_path: Path) -> str:
+    """Reads a PDF file to extract the SAP id"""
+    query_str = r"(Fra\.?\s+)" + SAP_pattern
+
+    pattern = re.compile(query_str, re.MULTILINE | re.IGNORECASE)
+
+    try:
+        reader = PdfReader(pdf_path)
+
+        for page in reader.pages:
+            text = page.extract_text()
+            if not text:
+                continue
+
+            match = pattern.search(text)
+
+            if not match:
+                continue
+
+            return match.group("year") + match.group("sapid")
+    except (PyPdfError, DependencyError) as e:
+        raise ParseSAPIdException(f"Could not read {pdf_path}: {e}") from e
+
+    raise ParseSAPIdException(f"No SAP ID found in {pdf_path}")

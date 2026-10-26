@@ -18,42 +18,33 @@
 
 from pathlib import Path
 
-from .defines import FolderName, Mode
+from .defines import FileSuffix, FolderName, Mode
 
 
-def bills_folder(input_folder: Path, mode: Mode) -> Path:
-    if mode == Mode.PROD:
-        return input_folder / FolderName.BILLS_INPUT_PROD.value
-    return (
-        input_folder / FolderName.TEST_FOLDER.value / FolderName.BILLS_INPUT_TEST.value
-    )
+def bills_folder(input_folder: Path) -> Path:
+    return input_folder / FolderName.BILLS.value
 
 
-def payments_folder(input_folder: Path, mode: Mode) -> Path:
-    if mode == Mode.PROD:
-        return input_folder / FolderName.PAYMENTS_INPUT_PROD.value
-    return (
-        input_folder
-        / FolderName.TEST_FOLDER.value
-        / FolderName.PAYMENTS_INPUT_TEST.value
-    )
+def payments_folder(input_folder: Path) -> Path:
+    return input_folder / FolderName.PAYMENTS.value
 
 
-def merged_output_folder(input_folder: Path) -> Path:
-    return input_folder / FolderName.OUTPUT.value / FolderName.MERGED_OUTPUT.value
+def merged_bills_and_payments_folder(input_folder: Path) -> Path:
+    return input_folder / FolderName.BILLS_AND_PAYMENTS.value
 
 
 def qa_errors_folder(merged_output_folder: Path) -> Path:
     return merged_output_folder / FolderName.QA_ERRORS.value
 
 
+def logs_folder(merged_output_folder: Path) -> Path:
+    return merged_output_folder / FolderName.LOGS.value
+
+
 def year_merged_folder(merged_output_folder: Path, year: str) -> Path:
-    return merged_output_folder / (year + FolderName.YEAR_FOLDER_SUFFIX.value)
+    return merged_output_folder / (year + FileSuffix.YEAR_FOLDER_SUFFIX.value)
 
 
-def sharepoint_sync_folder() -> Path:
-    return Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.RUNTIME.value
-
-
-def sharepoint_auth_folder() -> Path:
-    return Path(FolderName.SHAREPOINT_ROOT.value) / FolderName.AUTH_SYNC.value
+def sharepoint_sync_folder(mode: Mode) -> Path:
+    runtime = FolderName.RUNTIME_PROD if mode == Mode.PROD else FolderName.RUNTIME_TEST
+    return Path(FolderName.SHAREPOINT_ROOT.value) / runtime.value

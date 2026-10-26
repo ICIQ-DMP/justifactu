@@ -46,9 +46,9 @@ def blank_pdf(tmp_path: Path) -> Path:
 @pytest.fixture
 def billing_dirs(tmp_path: Path) -> tuple[Path, Path, Path]:
     """Creates bills, payments, and output directories under tmp_path."""
-    bills_dir = tmp_path / FolderName.BILLS_INPUT_PROD.value
-    payments_dir = tmp_path / FolderName.PAYMENTS_INPUT_PROD.value
-    output_dir = tmp_path / FolderName.GENERAL_OUTPUT.value
+    bills_dir = tmp_path / FolderName.BILLS.value
+    payments_dir = tmp_path / FolderName.PAYMENTS.value
+    output_dir = tmp_path / FolderName.LOGS.value
     bills_dir.mkdir()
     payments_dir.mkdir()
     return bills_dir, payments_dir, output_dir

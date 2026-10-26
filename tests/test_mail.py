@@ -14,8 +14,11 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import os
 from datetime import datetime
 from unittest.mock import patch, MagicMock
+
+import pytest
 
 from justifactu.defines import SecretNames
 from justifactu.mail import (
@@ -181,6 +184,10 @@ def test_mail_process(mock_log, mock_build_body, mock_send_auth):
     mock_log.info.assert_called_once_with("Email sent. Process complete.")
 
 
+@pytest.mark.skipif(
+    os.environ.get("CI") == "true",
+    reason="needs real SMTP secrets that are intentionally not in GitHub secrets",
+)
 def test_send_mail_authenticated_real():
     print(read_secret(SecretNames.SMTP_SERVER.value))
     print(read_secret(SecretNames.SMTP_PORT.value))

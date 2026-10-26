@@ -28,7 +28,7 @@ from .defines import FileSuffix, Phase, Mode
 from .paths import (
     bills_folder,
     payments_folder,
-    merged_output_folder,
+    merged_bills_and_payments_folder,
     qa_errors_folder,
     year_merged_folder,
 )
@@ -86,7 +86,10 @@ def merge_bills_and_payments(
         matched_payment: Path | None = payment_map.get(sap)
 
         if not matched_payment:
-            log.error(f"No matching payment found for bill {bill_path}")
+            log.error(
+                f"No matching payment found for bill {bill_path}",
+                extra={"qa_report": True},
+            )
             continue
 
         output_folder_path = year_merged_folder(merge_folder, sap.year)
@@ -139,30 +142,30 @@ def mock_phase3() -> None:
     log.error("Mocking phase 3 successful! :D")
 
 
-def _phase_folders(input_folder: Path, mode: Mode) -> tuple[Path, Path, Path]:
+def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
     return (
-        bills_folder(input_folder, mode),
-        payments_folder(input_folder, mode),
-        merged_output_folder(input_folder),
+        bills_folder(input_folder),
+        payments_folder(input_folder),
+        merged_bills_and_payments_folder(input_folder),
     )
 
 
-def _build_phase_map(
-    input_folder: Path, mode: Mode, ledger_path: Path
-) -> dict[Phase, Callable[[], None]]:
+def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[], None]]:
     bills_folder_path, payments_folder_path, bills_plus_payments_folder = (
-        _phase_folders(input_folder, mode)
+        _phase_folders(input_folder)
     )
 
     def _run_phase_1() -> None:
-        rename_payments(payments_folder_path, ledger_path)
+        rename_payments(payments_folder_path)
 
     def _run_phase_2() -> None:
+        # Bills are deleted after a successful merge in PROD and TEST, but kept in DEV
+        # so local test fixtures survive repeated runs.
         merge_bills_and_payments(
             bills_folder_path,
             payments_folder_path,
             bills_plus_payments_folder,
-            delete_processed=True,
+            delete_processed=mode != Mode.DEV,
         )
 
     return {
@@ -172,14 +175,14 @@ def _build_phase_map(
     }
 
 
-def run_phase(phase: Phase, input_folder: Path, mode: Mode, ledger_path: Path) -> None:
-    _build_phase_map(input_folder, mode, ledger_path)[phase]()
+def run_phase(phase: Phase, input_folder: Path, mode: Mode) -> None:
+    _build_phase_map(input_folder, mode)[phase]()
 
 
 FULL_RUN_PHASES: tuple[Phase, ...] = (Phase.PHASE_1, Phase.PHASE_2)
 
 
-def run_all_phases(input_folder: Path, mode: Mode, ledger_path: Path) -> None:
-    phase_map = _build_phase_map(input_folder, mode, ledger_path)
+def run_all_phases(input_folder: Path, mode: Mode) -> None:
+    phase_map = _build_phase_map(input_folder, mode)
     for phase in FULL_RUN_PHASES:
         phase_map[phase]()

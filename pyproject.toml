@@ -8,10 +8,9 @@ authors = [{name="AleixMT"}, {name="DavidRomeroICIQ"}]
 license = {text="GPL-3.0-or-later"}
 dependencies = [
     "pypdf",
+    "cryptography",
     "rich",
     "requests",
-    "pdfplumber",
-    "openpyxl",
 ]
 
 
@@ -21,12 +20,11 @@ justifactu-notify = "justifactu.notify:main"
 
 [project.optional-dependencies]
 dev = [
-  "black",
-  "pytest",
-  "mypy",
-  "ruff",
-  "pre-commit",
-  "types-openpyxl",
+  "black==26.5.1",
+  "pytest==9.1.1",
+  "mypy==2.1.0",
+  "ruff==0.15.18",
+  "pre-commit==4.6.0"
 ]
 
 [tool.semantic_release]

@@ -19,16 +19,40 @@ from pathlib import Path
 
 from .custom_except import MainCriticalError
 from .logger import get_logger
-from .defines import SecretNames
+from .defines import Mode, SecretNames
 from .secret import read_secret
 
 log = get_logger(__name__)
 
 
-def _set_drive_id(confdir: Path, drive_id: str) -> None:
-    """Rewrites the drive_id line in the onedrive config file."""
+def _drive_id_present(confdir: Path) -> bool:
+    """Whether the config file already has a non-empty drive_id value."""
     config_path = confdir / "config"
+    if not config_path.exists():
+        return False
+    for line in config_path.read_text().splitlines():
+        stripped = line.strip()
+        if stripped.startswith("drive_id"):
+            _, _, value = stripped.partition("=")
+            return value.strip().strip('"') != ""
+    return False
+
+
+def _write_drive_id_if_missing(confdir: Path) -> None:
+    """Writes the drive_id secret into the onedrive config file, but only
+    the first time — if a non-empty drive_id is already there, this is a
+    no-op. Unlike the old write-then-erase-every-call approach, the value
+    now persists once written, so the config file's content stays stable
+    across runs instead of churning on every invocation — churn that used
+    to make onedrive's own .config.backup change-detection think the
+    config had been edited and demand a --resync."""
+    if _drive_id_present(confdir):
+        return
+
+    config_path = confdir / "config"
+    config_path.touch(exist_ok=True)
     lines = config_path.read_text().splitlines()
+    drive_id = read_secret(SecretNames.DRIVE_ID.value)
     new_lines = []
     found = False
     for line in lines:
@@ -42,28 +66,30 @@ def _set_drive_id(confdir: Path, drive_id: str) -> None:
     config_path.write_text("\n".join(new_lines) + "\n")
 
 
-def _write_drive_id(confdir: Path) -> None:
-    """Writes the drive_id secret into the onedrive config file at launch,
-    so the real value is never permanently stored in the git-tracked file."""
-    _set_drive_id(confdir, read_secret(SecretNames.DRIVE_ID.value))
+# onedrive's own app-specific exit code for "the config differs from the last run's
+# .config.backup (or no backup exists yet) and a --resync is required before it will sync".
+# Hit on the first real sync after a fresh --auth bootstrap, since run_onedrive_auth never
+# invokes the sync engine and so never writes that backup.
+_RESYNC_REQUIRED_EXIT_CODE = 126
 
 
-def erase_drive_id(confdir: Path) -> None:
-    """Blanks the drive_id line in the onedrive config file, so the real
-    value does not sit on disk between runs."""
-    _set_drive_id(confdir, "")
-
-
-def _base_onedrive_args(confdir: Path, data_folder: Path) -> list[str]:
+def _base_onedrive_args(confdir: Path, data_folder: Path, mode: Mode) -> list[str]:
     """Flags shared by every sync invocation (download/upload)."""
-    return [
+    args_list = [
         "onedrive",
         "--confdir",
         str(confdir),
         "--syncdir",
         str(data_folder),
-        "--verbose",
     ]
+    if mode != Mode.PROD:
+        # Passed twice: a single --verbose only enables onedrive's own verboseLogging;
+        # the per-field debug lines around its config-change/--resync detection (which
+        # field it thinks changed, or whether .config.backup/.config.hash exist at
+        # check time) are gated behind debugLogging, which needs --verbose repeated.
+        # Left out in PROD so logs don't grow unbounded on real runs.
+        args_list += ["--verbose", "--verbose"]
+    return args_list
 
 
 def run_onedrive_sync(
@@ -71,14 +97,15 @@ def run_onedrive_sync(
     direction: str,
     single_dir: Path,
     data_folder: Path,
+    mode: Mode,
     dry_run: bool = False,
 ) -> None:
     """Runs a one-shot OneDrive-for-Linux sync and blocks until it exits."""
     log.info(f"Starting onedrive {direction} sync...")
     try:
-        _write_drive_id(confdir)
+        _write_drive_id_if_missing(confdir)
 
-        args_list = _base_onedrive_args(confdir, data_folder)
+        args_list = _base_onedrive_args(confdir, data_folder, mode)
         args_list += [
             "--sync",
             f"--{direction}-only",
@@ -87,10 +114,23 @@ def run_onedrive_sync(
         ]
         if direction == "download":
             args_list.append("--cleanup-local-files")
+        # No equivalent flag needed for "upload": onedrive already deletes remote
+        # files that no longer exist locally on --upload-only by default (its
+        # no_remote_delete setting defaults to false) — --no-remote-delete is the
+        # opt-OUT flag, so simply not passing it keeps that cleanup behavior on.
         if dry_run:
             args_list.append("--dry-run")
 
-        subprocess.run(args_list, check=True)
+        try:
+            subprocess.run(args_list, check=True)
+        except subprocess.CalledProcessError as e:
+            if e.returncode != _RESYNC_REQUIRED_EXIT_CODE:
+                raise
+            log.warning(
+                "OneDrive requires a --resync (no matching .config.backup found); "
+                "retrying once with --resync --resync-auth."
+            )
+            subprocess.run(args_list + ["--resync", "--resync-auth"], check=True)
         log.info(f"OneDrive {direction} sync complete.")
     except subprocess.CalledProcessError as e:
         raise MainCriticalError(
@@ -98,14 +138,9 @@ def run_onedrive_sync(
         ) from e
     except FileNotFoundError as e:
         raise MainCriticalError("onedrive binary not found on PATH") from e
-    finally:
-        try:
-            erase_drive_id(confdir)
-        except Exception as e:
-            log.error(f"Failed to erase drive_id from onedrive config: {e}")
 
 
-def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
+def run_onedrive_auth(confdir: Path, data_folder: Path, mode: Mode) -> None:
     """Runs a one-shot OneDrive-for-Linux authentication pass.
 
     No --single-directory, no --sync/--monitor: on a confdir with no
@@ -114,9 +149,9 @@ def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
     """
     log.info("Starting onedrive authentication...")
     try:
-        _write_drive_id(confdir)
+        _write_drive_id_if_missing(confdir)
 
-        args_list = _base_onedrive_args(confdir, data_folder)
+        args_list = _base_onedrive_args(confdir, data_folder, mode)
 
         subprocess.run(args_list, check=True)
         log.info("OneDrive authentication complete.")
@@ -126,8 +161,3 @@ def run_onedrive_auth(confdir: Path, data_folder: Path) -> None:
         ) from e
     except FileNotFoundError as e:
         raise MainCriticalError("onedrive binary not found on PATH") from e
-    finally:
-        try:
-            erase_drive_id(confdir)
-        except Exception as e:
-            log.error(f"Failed to erase drive_id from onedrive config: {e}")

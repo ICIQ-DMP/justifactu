@@ -20,8 +20,10 @@ from .SAP_ID import SAP_ID, parse_sap_id_from_string
 from .filesystem import change_file_name
 from .logger import get_logger
 
-from .bank_statement import index_statement_entries
-from .bills import parse_sap_id_from_bill
+
+from pypdf import PdfReader
+from pypdf.errors import DependencyError, PyPdfError
+
 from .custom_except import (
     ParseSAPIdException,
 )
@@ -37,7 +39,10 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
     for filename, payment_path in folder_map.items():
 
         if payment_path.suffix.lower() != ".pdf":
-            log.warning(f"Skipping {payment_path} because it is not a PDF")
+            log.warning(
+                f"Skipping {payment_path} because it is not a PDF",
+                extra={"qa_report": True},
+            )
             continue
 
         if payment_path.stem.endswith(FileSuffix.PROCESSED_PAYMENT.value):
@@ -56,7 +61,6 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
 
 def rename_payments(
     pdf_path: Path,
-    ledger_path: Path,
 ) -> dict[SAP_ID, Path]:
     """Renames the files from the payments folder, returning a SAP ID -> local path
     map for the files renamed in this run (so matching doesn't have to wait for
@@ -77,32 +81,45 @@ def rename_payments(
             continue
 
         if entry.suffix.lower() != ".pdf":
-            log.warning(f"Skipping file {entry}: non-PDF file")
+            log.warning(
+                f"Skipping file {entry}: non-PDF file", extra={"qa_report": True}
+            )
             continue
 
         try:
             log.info(f"Renaming: {entry.name}...")
 
-            sap_id = parse_sap_id_from_bill(entry)
+            sap_id = parse_sap_id_from_payment(entry)
             renamed_path = change_file_name(entry, f"{sap_id}-P")
             renamed_this_run[SAP_ID(sap_id)] = renamed_path
 
         except (ParseSAPIdException, FileNotFoundError) as e:
-            # Not a single-payment PDF - try treating it as a multi-row bank
-            # statement instead, where each row may carry its own SAP ID.
-            # The file itself is not renamed: a single statement can match
-            # several bills, so there's no one SAP ID to rename it to.
-            statement_entries = index_statement_entries(entry, ledger_path)
-
-            if not statement_entries:
-                log.error(f"Failed to rename {entry}: {e}")
-                continue
-
-            log.info(
-                f"Indexed {len(statement_entries)} entries from bank "
-                f"statement {entry.name}"
-            )
-            for statement_sap_id in statement_entries:
-                renamed_this_run[statement_sap_id] = entry
+            log.error(f"Failed to rename {entry}: {e}", extra={"qa_report": True})
 
     return renamed_this_run
+
+
+def parse_sap_id_from_payment(pdf_path: Path) -> str:
+    """Reads a PDF file to extract the SAP id"""
+    query_str = r"(Fra\.?\s+)" + SAP_pattern
+
+    pattern = re.compile(query_str, re.MULTILINE | re.IGNORECASE)
+
+    try:
+        reader = PdfReader(pdf_path)
+
+        for page in reader.pages:
+            text = page.extract_text()
+            if not text:
+                continue
+
+            match = pattern.search(text)
+
+            if not match:
+                continue
+
+            return match.group("year") + match.group("sapid")
+    except (PyPdfError, DependencyError) as e:
+        raise ParseSAPIdException(f"Could not read {pdf_path}: {e}") from e
+
+    raise ParseSAPIdException(f"No SAP ID found in {pdf_path}")

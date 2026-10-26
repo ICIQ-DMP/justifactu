@@ -98,11 +98,11 @@ real SharePoint path, and which `--mode` you ran with before assuming a code reg
 - **`paths.py`** (new file) composes real runtime `Path`s from an already-resolved base directory (and a `Mode`,
   where relevant) plus `FolderName` segments: `bills_folder(input_folder, mode)`, `payments_folder(input_folder,
   mode)`, `merged_output_folder(input_folder)`, `qa_errors_folder(merged_output_folder)`,
-  `year_merged_folder(merged_output_folder, year)`, `sharepoint_sync_folder()`, and `sharepoint_auth_folder()`.
-  This replaced hand-rolled, slightly-differently-written composition logic that used to be duplicated between
-  `process.py::_phase_folders` and `main.py`. **`sharepoint_auth_folder()` has no caller anywhere in the codebase**
-  — it's a best-effort reconstruction of the pre-`2ea3480` `justifactu/_auth_sync` constant, included for
-  completeness but currently unused; don't assume it's wired into the `--auth` flow just because it exists.
+  `year_merged_folder(merged_output_folder, year)`, and `sharepoint_sync_folder()`. This replaced hand-rolled,
+  slightly-differently-written composition logic that used to be duplicated between `process.py::_phase_folders`
+  and `main.py`. `sharepoint_auth_folder()` — a best-effort reconstruction of the pre-`2ea3480`
+  `justifactu/_auth_sync` constant that had no caller anywhere in the codebase — was removed, along with its
+  backing `FolderName.AUTH_SYNC` member, since nothing ever used it.
 - **`defaults.py`** computes the `ROOT_FOLDER`-relative fallback `Path` for CLI flags that need one —
   `default_onedrive_data_folder()`, `default_onedrive_conf_folder()`, `default_secrets_folder()` — all built from
   `FolderName` segments only. This file already existed before `64587cf` but was **dead code**: `arguments.py` had
@@ -341,9 +341,8 @@ breaks the agent's startup.
 
 `Jenkinsfile` (repo root) is explicitly marked **draft, not wired into any real Jenkins job** — currently a
 single-stage pipeline (`make install && make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder
-${OD_DATA} --dry-run"`, with a TODO to drop `--dry-run` once ready for real production runs), no `checkout scm`
-stage, no cron trigger, no build timeout, no `--mode` flag (so it silently runs in `Mode.TEST` — see "Path and
-folder-name composition" above). `OD_CONF`/`OD_DATA` are real, live-read environment variables (set at the
+${OD_DATA} --mode prod"`), no `checkout scm` stage, no cron trigger, no build timeout. `OD_CONF`/`OD_DATA` are
+real, live-read environment variables (set at the
 container level in `service/agent/dockerfile/Dockerfile`, consumed via `defaults.py` by `arguments.py`'s CLI-arg
 defaults). The `post` blocks call `make notify` (`notify.py`) rather than the Jenkins `emailext` step, for the
 `failure`/`aborted` notifications. Don't treat this file as a finished, production-ready pipeline.

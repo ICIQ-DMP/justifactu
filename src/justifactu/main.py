@@ -26,9 +26,13 @@ from justifactu.defines import (
     SyncDirection,
     InputLocation,
 )
-from justifactu.paths import merged_output_folder, qa_errors_folder
+from justifactu.paths import (
+    logs_folder,
+    merged_bills_and_payments_folder,
+    qa_errors_folder,
+)
 from justifactu.logger import (
-    ADMIN_LOG_FOLDER,
+    LOGS_FOLDER,
     configure_logging_from_settings,
     get_logger,
     get_user_log_path,
@@ -45,32 +49,34 @@ log = get_logger(__name__)
 
 def main() -> None:
     """"""
-    qa_report_path = ADMIN_LOG_FOLDER / (NOW + "_qa_report.log")
+    qa_report_path = LOGS_FOLDER / (NOW + "_qa_report.log")
     configure_logging_from_settings(qa_files_log_file=qa_report_path)
 
     args = process_parse_arguments()
     if args.phase is not None:
-        run_phase(args.phase, args.runtime_location, args.mode, args.ledger_path)
+        run_phase(args.phase, args.runtime_location, args.mode)
         return
 
     confdir = args.onedrive_conf_folder
 
     log.info("Starting...")
 
-    try:
-        if args.auth and args.location == InputLocation.SHAREPOINT:
-            run_onedrive_auth(
-                confdir,
-                data_folder=args.onedrive_data_folder,
-            )
-            exit(0)
+    if args.auth and args.location == InputLocation.SHAREPOINT:
+        run_onedrive_auth(
+            confdir,
+            data_folder=args.onedrive_data_folder,
+            mode=args.mode,
+        )
+        return
 
+    try:
         try:
             run_onedrive_sync(
                 confdir,
                 direction=SyncDirection.DOWNLOAD.value,
                 single_dir=args.sharepoint_sync_folder,
                 data_folder=args.onedrive_data_folder,
+                mode=args.mode,
                 dry_run=args.dry_run,
             )
         except MainCriticalError as e:
@@ -80,6 +86,7 @@ def main() -> None:
             )
             try:
                 token_manager, _, drive_id = connect_sharepoint()
+                log.warning("Downloading OneDrive content using API as fallback")
                 download_input_folder(
                     token_manager,
                     drive_id,
@@ -91,19 +98,26 @@ def main() -> None:
                     f"Graph API fallback download also failed: {fallback_error}"
                 ) from fallback_error
 
-        run_all_phases(args.runtime_location, args.mode, args.ledger_path)
-        bills_plus_payments_folder = merged_output_folder(args.runtime_location)
+        run_all_phases(args.runtime_location, args.mode)
+
+        bills_plus_payments_folder = merged_bills_and_payments_folder(
+            args.runtime_location
+        )
         qa_folder = qa_errors_folder(bills_plus_payments_folder)
         qa_folder.mkdir(parents=True, exist_ok=True)
         copy_file(qa_report_path, qa_folder)
-        regular_log_path = ADMIN_LOG_FOLDER / (NOW + ".log")
-        copy_file(regular_log_path, qa_folder)
+
+        regular_logs_folder = logs_folder(bills_plus_payments_folder)
+        regular_logs_folder.mkdir(parents=True, exist_ok=True)
+        regular_log_path = LOGS_FOLDER / (NOW + ".log")
+        copy_file(regular_log_path, regular_logs_folder)
 
         run_onedrive_sync(
             confdir,
             direction=SyncDirection.UPLOAD.value,
             single_dir=args.sharepoint_sync_folder,
             data_folder=args.onedrive_data_folder,
+            mode=args.mode,
             dry_run=args.dry_run,
         )
         log.info("Finished...")
@@ -115,7 +129,7 @@ def main() -> None:
     finally:
         try:
             send_qa_report_mail(
-                to_email=read_secret(SecretNames.SMTP_DEVELOPER_EMAIL.value),
+                to_email=read_secret(SecretNames.SMTP_OWNER_EMAIL.value),
                 message="Adjuntem el informe QA de l'execució.",
                 qa_report_path=qa_report_path,
                 additional_attachments=[get_user_log_path()],

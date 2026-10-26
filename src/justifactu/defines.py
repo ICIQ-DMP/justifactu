@@ -44,30 +44,32 @@ class Mode(StrEnum):
 
     PROD = "prod"
     TEST = "test"
+    DEV = "dev"
 
 
 class FolderName(StrEnum):
     """Named folders used across the pipeline."""
 
-    BILLS_INPUT_PROD = "FACTURES"
-    BILLS_INPUT_TEST = "FACTURES_prova"
-    PAYMENTS_INPUT_PROD = "Remeses"
-    PAYMENTS_INPUT_TEST = "Remeses_prova"
-    TEST_FOLDER = "carpeta_proves"
-    MERGED_OUTPUT = "FACTURES+PAGAMENTS"
-    QA_ERRORS = "QA_ERRORS"
-    YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
+    # Sharepoint folders
     SHAREPOINT_ROOT = "justifactu"
-    RUNTIME = "runtime"
-    OUTPUT = "_output"
-    GENERAL_OUTPUT = "output"
-    ADMIN_LOGS = "_admin_logs"
+
+    RUNTIME_PROD = "runtime"
+    RUNTIME_TEST = "runtime-test"
+
+    BILLS = "FACTURES"
+    PAYMENTS = "Remeses"
+    BILLS_AND_PAYMENTS = "FACTURES+PAGAMENTS"
+
+    QA_ERRORS = "QA_ERRORS"
+
+    # Repository folders
+    LOGS = "logs"
+    SECRETS = "secrets"
+
     SERVICE = "service"
     ONEDRIVE = "onedrive"
     ONEDRIVE_DATA = "data"
     ONEDRIVE_CONF = "conf"
-    SECRETS = "secrets"
-    AUTH_SYNC = "_auth_sync"
 
 
 class Phase(StrEnum):
@@ -81,6 +83,7 @@ class FileSuffix(StrEnum):
 
     MERGED_BILL_PAYMENT = "_F_P"
     PROCESSED_PAYMENT = "_merged"
+    YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
 
 
 class SecretNames(StrEnum):
@@ -101,8 +104,8 @@ class SecretNames(StrEnum):
     # smtp
     SMTP_PASSWORD = "SMTP_PASSWORD"
     SMTP_PORT = "SMTP_PORT"
-    SMTP_DEVELOPER_EMAIL = "SMTP_DEVELOPER_EMAIL"
     SMTP_SERVER = "SMTP_SERVER"
     SMTP_USERNAME = "SMTP_USERNAME"
     SMTP_ADMIN_EMAIL = "SMTP_ADMIN_EMAIL"
     SMTP_OWNER_EMAIL = "SMTP_OWNER_EMAIL"
+    SMTP_DEVELOPER_EMAIL = "SMTP_DEVELOPER_EMAIL"

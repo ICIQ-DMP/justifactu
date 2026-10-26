@@ -131,7 +131,7 @@ def read_sap_id_ledger(ledger_path: Path) -> dict[tuple[str, float], SAP_ID]:
     are skipped."""
     ledger: dict[tuple[str, float], SAP_ID] = {}
 
-    workbook = openpyxl.load_workbook(ledger_path, read_only=True, data_only=True)
+    workbook = openpyxl.load_workbook(ledger_path, data_only=True)
     sheet = workbook.active
     if sheet is None:
         raise ValueError(f"No active sheet found in ledger {ledger_path}")

@@ -21,7 +21,6 @@ from justifactu.arguments import (
     parse_input_location,
     parse_input_type,
     parse_arguments,
-    parse_file,
     process_parse_arguments,
 )
 from justifactu.custom_except import ArgumentInputLocationError
@@ -62,26 +61,6 @@ def test_parse_input_location_file_raises(tmp_path):
     file_path.touch()
     with pytest.raises(ArgumentInputLocationError, match="not a directory"):
         parse_input_location(str(file_path))
-
-
-# ── parse_file ─────────────────────────────────────────────────────
-
-
-def test_parse_file_valid_file(tmp_path):
-    file_path = tmp_path / "ledger.xlsx"
-    file_path.touch()
-    assert parse_file(str(file_path)) == file_path
-
-
-def test_parse_file_nonexistent_raises(tmp_path):
-    missing = tmp_path / "missing.xlsx"
-    with pytest.raises(ArgumentInputLocationError, match="does not exist"):
-        parse_file(str(missing))
-
-
-def test_parse_file_directory_raises(tmp_path):
-    with pytest.raises(ArgumentInputLocationError, match="not a file"):
-        parse_file(str(tmp_path))
 
 
 # ── --auth ────────────────────────────────────────────────────────────────────

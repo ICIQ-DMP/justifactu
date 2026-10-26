@@ -174,7 +174,7 @@ def test_rename_payments_renames_pdf(tmp_path):
         "justifactu.payments.parse_sap_id_from_payment",
         return_value=str(id_sap_instance),
     ):
-        result = rename_payments(payments_dir)
+        result = rename_payments(payments_dir, tmp_path / "ledger.xlsx")
 
     renamed_pdf = payments_dir / f"{id_sap_instance}-P.pdf"
     assert renamed_pdf.exists()
@@ -189,7 +189,7 @@ def test_rename_payments_skips_already_renamed(tmp_path):
     create_blank_pdf(already_renamed)
 
     with patch("justifactu.payments.parse_sap_id_from_payment") as mock_parse:
-        rename_payments(payments_dir)
+        rename_payments(payments_dir, tmp_path / "ledger.xlsx")
         mock_parse.assert_not_called()
 
 
@@ -200,7 +200,7 @@ def test_rename_payments_skips_non_pdf(tmp_path):
     txt_file.touch()
 
     with patch("justifactu.payments.parse_sap_id_from_payment") as mock_parse:
-        rename_payments(payments_dir)
+        rename_payments(payments_dir, tmp_path / "ledger.xlsx")
         mock_parse.assert_not_called()
 
 

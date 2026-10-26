@@ -54,7 +54,7 @@ def main() -> None:
 
     args = process_parse_arguments()
     if args.phase is not None:
-        run_phase(args.phase, args.runtime_location, args.mode)
+        run_phase(args.phase, args.runtime_location, args.mode, args.ledger_path)
         return
 
     confdir = args.onedrive_conf_folder
@@ -98,7 +98,7 @@ def main() -> None:
                     f"Graph API fallback download also failed: {fallback_error}"
                 ) from fallback_error
 
-        run_all_phases(args.runtime_location, args.mode)
+        run_all_phases(args.runtime_location, args.mode, args.ledger_path)
 
         bills_plus_payments_folder = merged_bills_and_payments_folder(
             args.runtime_location

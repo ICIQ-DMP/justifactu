@@ -55,11 +55,13 @@ def merge_bills_and_payments(
         **(freshly_renamed_payments or {}),
     }
     # A bank statement file can be matched by more than one SAP ID (several
-    # bills paid in the same statement); only rename/clean it up once every
-    # SAP ID pointing at it has been consumed.
-    remaining_matches: dict[Path, int] = {}
-    for path in payment_map.values():
-        remaining_matches[path] = remaining_matches.get(path, 0) + 1
+    # bills paid in the same statement). Rather than counting matches within
+    # this one run, check directly against the bills folder: only rename/
+    # clean up the payment file once none of its other SAP IDs still have a
+    # pending bill waiting for them.
+    sap_ids_by_payment_path: dict[Path, list[SAP_ID]] = {}
+    for sap_id, path in payment_map.items():
+        sap_ids_by_payment_path.setdefault(path, []).append(sap_id)
 
     successful_payments: set[Path] = set()
     qa_folder = qa_errors_folder(merge_folder)
@@ -103,16 +105,35 @@ def merge_bills_and_payments(
             merge_pdfs(bill_path, matched_payment, output_path)
             successful_payments.add(matched_payment)
 
-            remaining_matches[matched_payment] -= 1
-
             cleanup_processed_files(
                 bill_path,
                 matched_payment,
                 delete_processed,
-                rename_payment=remaining_matches[matched_payment] == 0,
+                rename_payment=_all_other_sap_ids_consumed(
+                    matched_payment, sap, sap_ids_by_payment_path, bills_folder
+                ),
             )
         except MergingBillWithPaymentError as e:
             log.exception(f"Failed to process {bill_path.name}: {e}")
+
+
+def _all_other_sap_ids_consumed(
+    matched_payment: Path,
+    just_processed: SAP_ID,
+    sap_ids_by_payment_path: dict[Path, list[SAP_ID]],
+    bills_folder: Path,
+) -> bool:
+    """Whether every other SAP ID this payment file is associated with
+    (relevant for a bank statement matching several bills) no longer has
+    a pending bill waiting for it - checked directly against the bills
+    folder, so it still works correctly when a statement's matches get
+    consumed across several separate runs, not just within one."""
+    for sap_id in sap_ids_by_payment_path.get(matched_payment, []):
+        if sap_id == just_processed:
+            continue
+        if (bills_folder / f"F {sap_id}.pdf").exists():
+            return False
+    return True
 
 
 def cleanup_processed_files(
@@ -150,13 +171,16 @@ def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
     )
 
 
-def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[], None]]:
+def _build_phase_map(
+    input_folder: Path, mode: Mode, ledger_path: Path
+) -> dict[Phase, Callable[[], None]]:
     bills_folder_path, payments_folder_path, bills_plus_payments_folder = (
         _phase_folders(input_folder)
     )
+    freshly_renamed: dict[SAP_ID, Path] = {}
 
     def _run_phase_1() -> None:
-        rename_payments(payments_folder_path)
+        freshly_renamed.update(rename_payments(payments_folder_path, ledger_path))
 
     def _run_phase_2() -> None:
         # Bills are deleted after a successful merge in PROD and TEST, but kept in DEV
@@ -166,6 +190,7 @@ def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[],
             payments_folder_path,
             bills_plus_payments_folder,
             delete_processed=mode != Mode.DEV,
+            freshly_renamed_payments=freshly_renamed,
         )
 
     return {
@@ -175,14 +200,14 @@ def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[],
     }
 
 
-def run_phase(phase: Phase, input_folder: Path, mode: Mode) -> None:
-    _build_phase_map(input_folder, mode)[phase]()
+def run_phase(phase: Phase, input_folder: Path, mode: Mode, ledger_path: Path) -> None:
+    _build_phase_map(input_folder, mode, ledger_path)[phase]()
 
 
 FULL_RUN_PHASES: tuple[Phase, ...] = (Phase.PHASE_1, Phase.PHASE_2)
 
 
-def run_all_phases(input_folder: Path, mode: Mode) -> None:
-    phase_map = _build_phase_map(input_folder, mode)
+def run_all_phases(input_folder: Path, mode: Mode, ledger_path: Path) -> None:
+    phase_map = _build_phase_map(input_folder, mode, ledger_path)
     for phase in FULL_RUN_PHASES:
         phase_map[phase]()

@@ -153,8 +153,27 @@ def parse_arguments() -> argparse.Namespace:
         help="Run mode. Possible values: " + ", ".join(m.value for m in Mode),
     )
 
+    parser.add_argument(
+        "--ledger-path",
+        type=parse_file,
+        required=False,
+        default=None,
+        help="Path to the bank statement reconciliation ledger (.xlsx) mapping "
+        "transaction dates/totals to SAP IDs. Required when running phase 1 "
+        "or a full run (no --phase given).",
+    )
+
     args = parser.parse_args()
     return args
+
+
+def parse_file(value: str) -> Path:
+    path = Path(value)
+    if not path.exists():
+        raise ArgumentInputLocationError(f"Path {value} does not exist")
+    if not path.is_file():
+        raise ArgumentInputLocationError(f"Path {value} is not a file")
+    return path
 
 
 def process_parse_arguments() -> argparse.Namespace:
@@ -168,19 +187,26 @@ def process_parse_arguments() -> argparse.Namespace:
     try:
         args = parse_arguments()
 
-    except argparse.ArgumentTypeError as e:
-        print("Arguments could not have been parsed. Internal error is " + e.__str__())
+        if args.sharepoint_sync_folder is None:
+            args.sharepoint_sync_folder = parse_directory(
+                str(sharepoint_sync_folder(args.mode))
+            )
+
+        if args.runtime_location is None:
+            args.runtime_location = parse_directory(
+                str(args.onedrive_data_folder / args.sharepoint_sync_folder)
+            )
+
+        phase_needs_ledger = args.phase in (None, Phase.PHASE_1)
+        if phase_needs_ledger and args.ledger_path is None:
+            raise ArgumentInputLocationError(
+                "--ledger-path is required when running phase 1 or a full run "
+                "(no --phase specified)."
+            )
+
+    except (argparse.ArgumentTypeError, ArgumentInputLocationError) as e:
+        print("Arguments couldn't be parsed. Internal error is " + str(e))
         print(common)
         exit(5)
-
-    if args.sharepoint_sync_folder is None:
-        args.sharepoint_sync_folder = parse_directory(
-            str(sharepoint_sync_folder(args.mode))
-        )
-
-    if args.runtime_location is None:
-        args.runtime_location = parse_directory(
-            str(args.onedrive_data_folder / args.sharepoint_sync_folder)
-        )
 
     return args

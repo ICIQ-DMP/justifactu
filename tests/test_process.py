@@ -33,6 +33,6 @@ def test_run_phase_2_delete_processed_depends_on_mode(
     tmp_path, mode, expected_delete_processed
 ):
     with patch("justifactu.process.merge_bills_and_payments") as mock_merge:
-        run_phase(Phase.PHASE_2, tmp_path, mode)
+        run_phase(Phase.PHASE_2, tmp_path, mode, tmp_path / "ledger.xlsx")
 
     assert mock_merge.call_args.kwargs["delete_processed"] is expected_delete_processed

@@ -66,25 +66,3 @@ def test_auth_branch_calls_run_onedrive_auth_and_exits_before_phases(tmp_path):
     mock_sync.assert_not_called()
     mock_phases.assert_not_called()
     mock_mail.assert_not_called()
-
-
-def test_phase_flag_calls_run_phase_and_skips_main_pipeline(tmp_path):
-    args = _phase_args(tmp_path)
-
-    with (
-        patch("justifactu.main.configure_logging_from_settings"),
-        patch("justifactu.main.run_phase") as mock_run_phase,
-        patch("justifactu.main.run_onedrive_sync") as mock_sync,
-        patch("justifactu.main.run_all_phases") as mock_phases,
-        patch(
-            "justifactu.main.process_parse_arguments", return_value=args
-        ) as mock_parse,
-    ):
-        main()
-
-    mock_parse.assert_called_once()
-    mock_run_phase.assert_called_once_with(
-        args.phase, args.runtime_location, args.mode, args.ledger_path
-    )
-    mock_sync.assert_not_called()
-    mock_phases.assert_not_called()

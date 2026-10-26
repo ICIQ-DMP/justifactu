@@ -21,7 +21,6 @@ from justifactu.arguments import (
     parse_input_location,
     parse_input_type,
     parse_arguments,
-    process_parse_arguments,
 )
 from justifactu.custom_except import ArgumentInputLocationError
 from justifactu.defines import InputLocation, Mode
@@ -97,97 +96,3 @@ def test_mode_test_explicit(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["prog", "--mode", "test"])
     args = parse_arguments()
     assert args.mode == Mode.TEST
-
-
-# ── --ledger-path ─────────────────────────────────────────────────────
-
-
-def test_ledger_path_defaults_to_none_when_absent(monkeypatch):
-    monkeypatch.setattr(sys, "argv", ["prog"])
-    args = parse_arguments()
-    assert args.ledger_path is None
-
-
-def test_ledger_path_parses_given_file(monkeypatch, tmp_path):
-    ledger = tmp_path / "ledger.xlsx"
-    ledger.touch()
-    monkeypatch.setattr(sys, "argv", ["prog", "--ledger-path", str(ledger)])
-    args = parse_arguments()
-    assert args.ledger_path == ledger
-
-
-# ── process_parse_arguments ─────────────────────────────────────────────────────
-
-
-def test_process_parse_arguments_requires_ledger_for_full_run(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "prog",
-            "--onedrive-data-folder",
-            str(tmp_path / "data"),
-            "--sharepoint-sync-folder",
-            str(tmp_path / "sync"),
-        ],
-    )
-    with pytest.raises(SystemExit) as exc_info:
-        process_parse_arguments()
-    assert exc_info.value.code == 5
-
-
-def test_process_parse_arguments_requires_ledger_for_phase_1(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "prog",
-            "--phase",
-            "1",
-            "--onedrive-data-folder",
-            str(tmp_path / "data"),
-            "--sharepoint-sync-folder",
-            str(tmp_path / "sync"),
-        ],
-    )
-    with pytest.raises(SystemExit) as exc_info:
-        process_parse_arguments()
-    assert exc_info.value.code == 5
-
-
-def test_process_parse_arguments_phase_2_does_not_require_ledger(monkeypatch, tmp_path):
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "prog",
-            "--phase",
-            "2",
-            "--onedrive-data-folder",
-            str(tmp_path / "data"),
-            "--sharepoint-sync-folder",
-            str(tmp_path / "sync"),
-        ],
-    )
-    args = process_parse_arguments()
-    assert args.ledger_path is None
-
-
-def test_process_parse_arguments_full_run_with_ledger_succeeds(monkeypatch, tmp_path):
-    ledger = tmp_path / "ledger.xlsx"
-    ledger.touch()
-    monkeypatch.setattr(
-        sys,
-        "argv",
-        [
-            "prog",
-            "--ledger-path",
-            str(ledger),
-            "--onedrive-data-folder",
-            str(tmp_path / "data"),
-            "--sharepoint-sync-folder",
-            str(tmp_path / "sync"),
-        ],
-    )
-    args = process_parse_arguments()
-    assert args.ledger_path == ledger

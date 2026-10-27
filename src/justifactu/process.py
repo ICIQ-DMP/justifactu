@@ -110,7 +110,7 @@ def merge_bills_and_payments(
                 matched_payment,
                 delete_processed,
                 rename_payment=_all_other_sap_ids_consumed(
-                    matched_payment, sap, sap_ids_by_payment_path, bills_folder
+                    matched_payment, sap, sap_ids_by_payment_path, merge_folder
                 ),
             )
         except MergingBillWithPaymentError as e:
@@ -121,17 +121,21 @@ def _all_other_sap_ids_consumed(
     matched_payment: Path,
     just_processed: SAP_ID,
     sap_ids_by_payment_path: dict[Path, list[SAP_ID]],
-    bills_folder: Path,
+    merge_folder: Path,
 ) -> bool:
     """Whether every other SAP ID this payment file is associated with
-    (relevant for a bank statement matching several bills) no longer has
-    a pending bill waiting for it - checked directly against the bills
-    folder, so it still works correctly when a statement's matches get
-    consumed across several separate runs, not just within one."""
+    (relevant for a bank statement matching several bills) has already
+    been successfully merged - checked against the merged-output folder
+    directly, so it works correctly across separate runs and regardless
+    of whether bills are deleted after merging (delete_processed)."""
     for sap_id in sap_ids_by_payment_path.get(matched_payment, []):
         if sap_id == just_processed:
             continue
-        if (bills_folder / f"F {sap_id}.pdf").exists():
+        expected_output = (
+            year_merged_folder(merge_folder, sap_id.year)
+            / f"{sap_id}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+        )
+        if not expected_output.exists():
             return False
     return True
 

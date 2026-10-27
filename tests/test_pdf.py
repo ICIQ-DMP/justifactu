@@ -14,11 +14,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
+from justifactu.custom_except import ParseSAPIdException
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
 from justifactu.defines import FileSuffix, FolderName
+from justifactu.paths import year_merged_folder
 from justifactu.payments import (
     index_payments,
     rename_payments,
@@ -26,6 +28,7 @@ from justifactu.payments import (
 from justifactu.process import (
     cleanup_processed_files,
     merge_bills_and_payments,
+    _all_other_sap_ids_consumed,
 )
 from justifactu.filesystem import index_folder
 from justifactu.pdf import (
@@ -204,6 +207,52 @@ def test_rename_payments_skips_non_pdf(tmp_path):
         mock_parse.assert_not_called()
 
 
+def test_rename_payments_falls_back_to_bank_statement(tmp_path):
+    payments_dir = tmp_path / FolderName.PAYMENTS.value
+    payments_dir.mkdir()
+    statement_pdf = payments_dir / "bank_statement.pdf"
+    create_blank_pdf(statement_pdf)
+    ledger_path = tmp_path / "ledger.xlsx"
+
+    statement_entries = {id_sap_instance: MagicMock()}
+
+    with (
+        patch(
+            "justifactu.payments.parse_sap_id_from_payment",
+            side_effect=ParseSAPIdException("no SAP ID found"),
+        ),
+        patch(
+            "justifactu.payments.index_statement_entries",
+            return_value=statement_entries,
+        ) as mock_index,
+    ):
+        result = rename_payments(payments_dir, ledger_path)
+
+    mock_index.assert_called_once_with(statement_pdf, ledger_path)
+    assert result == {id_sap_instance: statement_pdf}
+    assert statement_pdf.exists()
+
+
+def test_rename_payments_no_statement_matches_skips_file(tmp_path):
+    payments_dir = tmp_path / FolderName.PAYMENTS.value
+    payments_dir.mkdir()
+    statement_pdf = payments_dir / "bank_statement.pdf"
+    create_blank_pdf(statement_pdf)
+    ledger_path = tmp_path / "ledger.xlsx"
+
+    with (
+        patch(
+            "justifactu.payments.parse_sap_id_from_payment",
+            side_effect=ParseSAPIdException("no SAP ID found"),
+        ),
+        patch("justifactu.payments.index_statement_entries", return_value={}),
+    ):
+        result = rename_payments(payments_dir, ledger_path)
+
+    assert result == {}
+    assert statement_pdf.exists()
+
+
 # ── merge_bills_and_payments ──────────────────────────────────────────────────
 
 
@@ -265,3 +314,122 @@ def test_merge_bills_and_payments_delete_processed(mock_cleanup, billing_dirs):
     merge_bills_and_payments(bills_dir, payments_dir, output_dir, delete_processed=True)
 
     assert mock_cleanup.call_args.args[2] is True  # delete_processed passed through
+
+
+def test_merge_bills_and_payments_shared_statement_only_renamed_once(billing_dirs):
+    bills_dir, payments_dir, output_dir = billing_dirs
+
+    sap_id_a = SAP_ID("2034567890")
+    sap_id_b = SAP_ID("2034567891")
+
+    bill_a = bills_dir / f"F {sap_id_a}.pdf"
+    bill_b = bills_dir / f"F {sap_id_b}.pdf"
+    create_blank_pdf(bill_a)
+    create_blank_pdf(bill_b)
+
+    statement_pdf = payments_dir / "bank_statement.pdf"
+    create_blank_pdf(statement_pdf)
+
+    merge_bills_and_payments(
+        bills_dir,
+        payments_dir,
+        output_dir,
+        delete_processed=True,
+        freshly_renamed_payments={sap_id_a: statement_pdf, sap_id_b: statement_pdf},
+    )
+
+    expected_a = (
+        year_merged_folder(output_dir, sap_id_a.year)
+        / f"{sap_id_a}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+    )
+    expected_b = (
+        year_merged_folder(output_dir, sap_id_b.year)
+        / f"{sap_id_b}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+    )
+    assert expected_a.exists()
+    assert expected_b.exists()
+
+    renamed_statement = (
+        payments_dir / f"bank_statement{FileSuffix.PROCESSED_PAYMENT.value}.pdf"
+    )
+    assert renamed_statement.exists()
+
+
+def test_merge_bills_and_payments_cross_run_rename_waits_for_all_matches(billing_dirs):
+    bills_dir, payments_dir, output_dir = billing_dirs
+
+    sap_id_a = SAP_ID("2034567890")
+    sap_id_b = SAP_ID("2034567891")
+    statement_pdf = payments_dir / "bank_statement.pdf"
+    create_blank_pdf(statement_pdf)
+
+    bill_a = bills_dir / f"F {sap_id_a}.pdf"
+    create_blank_pdf(bill_a)
+
+    # "Run 1": only bill A has arrived so far
+    merge_bills_and_payments(
+        bills_dir,
+        payments_dir,
+        output_dir,
+        delete_processed=True,
+        freshly_renamed_payments={sap_id_a: statement_pdf, sap_id_b: statement_pdf},
+    )
+
+    renamed_statement = (
+        payments_dir / f"bank_statement{FileSuffix.PROCESSED_PAYMENT.value}.pdf"
+    )
+    assert not renamed_statement.exists()
+    assert statement_pdf.exists()
+
+    # "Run 2": bill B finally arrives
+    bill_b = bills_dir / f"F {sap_id_b}.pdf"
+    create_blank_pdf(bill_b)
+
+    merge_bills_and_payments(
+        bills_dir,
+        payments_dir,
+        output_dir,
+        delete_processed=True,
+        freshly_renamed_payments={sap_id_a: statement_pdf, sap_id_b: statement_pdf},
+    )
+
+    assert renamed_statement.exists()
+
+
+def test_all_other_sap_ids_consumed_false_when_other_not_yet_merged(tmp_path):
+    sap_id_a = SAP_ID("2034567890")
+    sap_id_b = SAP_ID("2034567891")
+    statement_path = tmp_path / "statement.pdf"
+    merge_folder = tmp_path / "output"
+
+    result = _all_other_sap_ids_consumed(
+        statement_path,
+        sap_id_a,
+        {statement_path: [sap_id_a, sap_id_b]},
+        merge_folder,
+    )
+
+    assert result is False
+
+
+def test_all_other_sap_ids_consumed_true_when_all_others_already_merged(tmp_path):
+    sap_id_a = SAP_ID("2034567890")
+    sap_id_b = SAP_ID("2034567891")
+    statement_path = tmp_path / "statement.pdf"
+    merge_folder = tmp_path / "output"
+
+    existing_output = (
+        year_merged_folder(merge_folder, sap_id_b.year)
+        / f"{sap_id_b}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+    )
+    existing_output.parent.mkdir(parents=True)
+    existing_output.touch()
+
+    result = _all_other_sap_ids_consumed(
+        statement_path,
+        sap_id_a,
+        {statement_path: [sap_id_a, sap_id_b]},
+        merge_folder,
+    )
+
+    assert result is True

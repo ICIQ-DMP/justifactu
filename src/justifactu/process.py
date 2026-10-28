@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Callable
 
 from .SAP_ID import SAP_ID
+from .bank_statement import find_year_ledger, index_statement_entries
 from .bills import parse_bill_filename
 from .custom_except import (
     MergingBillWithPaymentError,
@@ -31,6 +32,7 @@ from .paths import (
     merged_bills_and_payments_folder,
     qa_errors_folder,
     year_merged_folder,
+    card_statements_folder,
 )
 from .filesystem import list_dir, index_folder, change_file_name
 from .logger import get_logger
@@ -54,15 +56,6 @@ def merge_bills_and_payments(
         **index_payments(index_folder(payments_folder)),
         **(freshly_renamed_payments or {}),
     }
-    # A bank statement file can be matched by more than one SAP ID (several
-    # bills paid in the same statement). Rather than counting matches within
-    # this one run, check directly against the bills folder: only rename/
-    # clean up the payment file once none of its other SAP IDs still have a
-    # pending bill waiting for them.
-    sap_ids_by_payment_path: dict[Path, list[SAP_ID]] = {}
-    for sap_id, path in payment_map.items():
-        sap_ids_by_payment_path.setdefault(path, []).append(sap_id)
-
     successful_payments: set[Path] = set()
     qa_folder = qa_errors_folder(merge_folder)
     qa_folder.mkdir(parents=True, exist_ok=True)
@@ -88,9 +81,8 @@ def merge_bills_and_payments(
         matched_payment: Path | None = payment_map.get(sap)
 
         if not matched_payment:
-            log.error(
-                f"No matching payment found for bill {bill_path}",
-                extra={"qa_report": True},
+            log.info(
+                f"No direct payment for bill {bill_path}; deferring to card statements"
             )
             continue
 
@@ -109,49 +101,21 @@ def merge_bills_and_payments(
                 bill_path,
                 matched_payment,
                 delete_processed,
-                rename_payment=_all_other_sap_ids_consumed(
-                    matched_payment, sap, sap_ids_by_payment_path, merge_folder
-                ),
             )
         except MergingBillWithPaymentError as e:
             log.exception(f"Failed to process {bill_path.name}: {e}")
-
-
-def _all_other_sap_ids_consumed(
-    matched_payment: Path,
-    just_processed: SAP_ID,
-    sap_ids_by_payment_path: dict[Path, list[SAP_ID]],
-    merge_folder: Path,
-) -> bool:
-    """Whether every other SAP ID this payment file is associated with
-    (relevant for a bank statement matching several bills) has already
-    been successfully merged - checked against the merged-output folder
-    directly, so it works correctly across separate runs and regardless
-    of whether bills are deleted after merging (delete_processed)."""
-    for sap_id in sap_ids_by_payment_path.get(matched_payment, []):
-        if sap_id == just_processed:
-            continue
-        expected_output = (
-            year_merged_folder(merge_folder, sap_id.year)
-            / f"{sap_id}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
-        )
-        if not expected_output.exists():
-            return False
-    return True
 
 
 def cleanup_processed_files(
     bill_path: Path,
     matched_payment: Path,
     delete_processed: bool,
-    rename_payment: bool = True,
 ) -> None:
     """Renames the payment file and optionally deletes the bill file"""
+    new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT.value}"
     try:
-        if rename_payment:
-            new_name = f"{matched_payment.stem}{FileSuffix.PROCESSED_PAYMENT.value}"
-            change_file_name(matched_payment, new_name)
-            log.info(f"Renamed processed payment file: {matched_payment.name}")
+        change_file_name(matched_payment, new_name)
+        log.info(f"Renamed processed payment file: {matched_payment.name}")
 
         if delete_processed:
             bill_path.unlink(missing_ok=True)
@@ -163,8 +127,62 @@ def cleanup_processed_files(
         )
 
 
-def mock_phase3() -> None:
-    log.error("Mocking phase 3 successful! :D")
+def merge_bills_and_card_statements(
+    bills_folder: Path,
+    cards_folder: Path,
+    merge_folder: Path,
+    delete_processed: bool = False,
+) -> None:
+    """Phase 3: matches remaining bills against card statements through each
+    year's ledger, merging the bill with the whole statement. Statements and
+    ledgers are never renamed or moved."""
+    if not cards_folder.is_dir():
+        log.warning(f"{cards_folder} is not a directory", extra={"qa_report": True})
+        return
+
+    statement_by_sap: dict[SAP_ID, Path] = {}
+    for year_folder in sorted(p for p in cards_folder.iterdir() if p.is_dir()):
+        ledger_path = find_year_ledger(year_folder)
+        if ledger_path is None:
+            continue
+        for statement in sorted(year_folder.glob("*.pdf")):
+            for sap_id in index_statement_entries(statement, ledger_path):
+                statement_by_sap[sap_id] = statement
+
+    for bill_path in list_dir(bills_folder):
+        if bill_path.suffix.lower() != ".pdf":
+            continue
+        try:
+            sap = parse_bill_filename(bill_path.stem)
+        except ParseSAPIdException:
+            continue
+
+        output_folder_path = year_merged_folder(merge_folder, sap.year)
+        output_path = (
+            output_folder_path / f"{sap}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
+        )
+        if output_path.exists():
+            continue
+
+        matched_statement = statement_by_sap.get(sap)
+        if matched_statement is None:
+            log.error(
+                f"No matching payment or card statement found for bill {bill_path}",
+                extra={"qa_report": True},
+            )
+            continue
+
+        output_folder_path.mkdir(parents=True, exist_ok=True)
+        try:
+            log.info(
+                f"Merging {bill_path.name} with card statement {matched_statement.name}..."
+            )
+            merge_pdfs(bill_path, matched_statement, output_path)
+            if delete_processed:
+                bill_path.unlink(missing_ok=True)
+                log.info(f"Deleted: {bill_path.name}")
+        except MergingBillWithPaymentError as e:
+            log.exception(f"Failed to process {bill_path.name}: {e}")
 
 
 def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
@@ -175,16 +193,13 @@ def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
     )
 
 
-def _build_phase_map(
-    input_folder: Path, mode: Mode, ledger_path: Path
-) -> dict[Phase, Callable[[], None]]:
+def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[], None]]:
     bills_folder_path, payments_folder_path, bills_plus_payments_folder = (
         _phase_folders(input_folder)
     )
-    freshly_renamed: dict[SAP_ID, Path] = {}
 
     def _run_phase_1() -> None:
-        freshly_renamed.update(rename_payments(payments_folder_path, ledger_path))
+        rename_payments(payments_folder_path)
 
     def _run_phase_2() -> None:
         # Bills are deleted after a successful merge in PROD and TEST, but kept in DEV
@@ -194,24 +209,31 @@ def _build_phase_map(
             payments_folder_path,
             bills_plus_payments_folder,
             delete_processed=mode != Mode.DEV,
-            freshly_renamed_payments=freshly_renamed,
+        )
+
+    def _run_phase_3() -> None:
+        merge_bills_and_card_statements(
+            bills_folder_path,
+            card_statements_folder(input_folder),
+            bills_plus_payments_folder,
+            delete_processed=mode != Mode.DEV,
         )
 
     return {
         Phase.PHASE_1: _run_phase_1,
         Phase.PHASE_2: _run_phase_2,
-        Phase.PHASE_3: mock_phase3,
+        Phase.PHASE_3: _run_phase_3,
     }
 
 
-def run_phase(phase: Phase, input_folder: Path, mode: Mode, ledger_path: Path) -> None:
-    _build_phase_map(input_folder, mode, ledger_path)[phase]()
+def run_phase(phase: Phase, input_folder: Path, mode: Mode) -> None:
+    _build_phase_map(input_folder, mode)[phase]()
 
 
-FULL_RUN_PHASES: tuple[Phase, ...] = (Phase.PHASE_1, Phase.PHASE_2)
+FULL_RUN_PHASES: tuple[Phase, ...] = (Phase.PHASE_1, Phase.PHASE_2, Phase.PHASE_3)
 
 
-def run_all_phases(input_folder: Path, mode: Mode, ledger_path: Path) -> None:
-    phase_map = _build_phase_map(input_folder, mode, ledger_path)
+def run_all_phases(input_folder: Path, mode: Mode) -> None:
+    phase_map = _build_phase_map(input_folder, mode)
     for phase in FULL_RUN_PHASES:
         phase_map[phase]()

@@ -138,7 +138,7 @@ def setup_logging(
     # ---- console (Rich)
     console = RichHandler(
         rich_tracebacks=True,
-        markup=True,
+        markup=False,
         show_time=False,
         show_level=True,
         show_path=False,
@@ -181,6 +181,11 @@ def setup_logging(
         format=MESSAGE_FORMAT,
         force=True,
     )
+
+    # Third-party parsers are extremely verbose at DEBUG (thousands of lines
+    # per PDF) and their messages contain raw PDF syntax.
+    for noisy in ("pdfminer", "pdfplumber"):
+        logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
 def get_logger(name: str) -> ExtendedLogger:

@@ -17,7 +17,6 @@ import re
 from pathlib import Path
 
 from .SAP_ID import SAP_ID, parse_sap_id_from_string
-from .bank_statement import index_statement_entries
 from .filesystem import change_file_name
 from .logger import get_logger
 
@@ -62,7 +61,6 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
 
 def rename_payments(
     pdf_path: Path,
-    ledger_path: Path,
 ) -> dict[SAP_ID, Path]:
     """Renames the files from the payments folder, returning a SAP ID -> local path
     map for the files renamed in this run (so matching doesn't have to wait for
@@ -96,18 +94,7 @@ def rename_payments(
             renamed_this_run[SAP_ID(sap_id)] = renamed_path
 
         except (ParseSAPIdException, FileNotFoundError) as e:
-            statement_entries = index_statement_entries(entry, ledger_path)
-
-            if not statement_entries:
-                log.error(f"Failed to rename {entry}: {e}", extra={"qa_report": True})
-                continue
-
-            log.info(
-                f"Indexed {len(statement_entries)} entries from bank "
-                f"statement {entry.name}"
-            )
-            for statement_sap_id in statement_entries:
-                renamed_this_run[statement_sap_id] = entry
+            log.error(f"Failed to rename {entry}: {e}", extra={"qa_report": True})
 
     return renamed_this_run
 

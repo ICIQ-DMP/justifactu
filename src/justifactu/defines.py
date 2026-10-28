@@ -59,6 +59,7 @@ class FolderName(StrEnum):
     BILLS = "FACTURES"
     PAYMENTS = "Remeses"
     BILLS_AND_PAYMENTS = "FACTURES+PAGAMENTS"
+    CARD_STATEMENTS = "Targetes"
 
     QA_ERRORS = "QA_ERRORS"
 

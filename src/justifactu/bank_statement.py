@@ -13,7 +13,9 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import io
 import re
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TypedDict, cast
@@ -31,6 +33,9 @@ DATE_PATTERN = re.compile(r"^\d{4}$")
 AMOUNT_PATTERN = re.compile(r"^\d{1,3}(?:\.\d{3})*,\d{2}$")
 CONCEPT_COLUMN_END_X = 289  # next column (location/reference/etc.) starts here
 COMMISSION_MARKER = "Comissió per conversió de divises"
+AUTOFILTER_PATTERN = re.compile(
+    rb"<autoFilter\b[^>]*(?:/>|>.*?</autoFilter>)", re.DOTALL
+)
 
 
 class Word(TypedDict):
@@ -46,6 +51,22 @@ class BankEntry:
     date: str  # DDMM
     concept: str
     total: float
+
+
+def _strip_autofilters(path: Path) -> io.BytesIO:
+    """In-memory copy of the workbook without <autoFilter> elements: openpyxl
+    can't parse whole-row filter ranges (ref="1:644") that Excel writes."""
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(path) as src, zipfile.ZipFile(buffer, "w") as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename.startswith("xl/worksheets/") and item.filename.endswith(
+                ".xml"
+            ):
+                data = AUTOFILTER_PATTERN.sub(b"", data)
+            dst.writestr(item, data)
+    buffer.seek(0)
+    return buffer
 
 
 def _merge_commission_rows(entries: list[BankEntry]) -> list[BankEntry]:
@@ -131,7 +152,7 @@ def read_sap_id_ledger(ledger_path: Path) -> dict[tuple[str, float], SAP_ID]:
     are skipped."""
     ledger: dict[tuple[str, float], SAP_ID] = {}
 
-    workbook = openpyxl.load_workbook(ledger_path, data_only=True)
+    workbook = openpyxl.load_workbook(_strip_autofilters(ledger_path), data_only=True)
     sheet = workbook.active
     if sheet is None:
         raise ValueError(f"No active sheet found in ledger {ledger_path}")
@@ -189,3 +210,16 @@ def index_statement_entries(
         entries_by_sap[sap_id] = entry
 
     return entries_by_sap
+
+
+def find_year_ledger(year_folder: Path) -> Path | None:
+    """Returns the single ledger .xlsx in a Targetes year folder, or None
+    (QA-logged) if there isn't exactly one."""
+    ledgers = [p for p in year_folder.glob("*.xlsx") if not p.name.startswith("~$")]
+    if len(ledgers) != 1:
+        log.error(
+            f"Expected exactly one ledger .xlsx in {year_folder}, found {len(ledgers)}",
+            extra={"qa_report": True},
+        )
+        return None
+    return ledgers[0]

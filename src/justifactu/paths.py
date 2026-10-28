@@ -48,3 +48,7 @@ def year_merged_folder(merged_output_folder: Path, year: str) -> Path:
 def sharepoint_sync_folder(mode: Mode) -> Path:
     runtime = FolderName.RUNTIME_PROD if mode == Mode.PROD else FolderName.RUNTIME_TEST
     return Path(FolderName.SHAREPOINT_ROOT.value) / runtime.value
+
+
+def card_statements_folder(input_folder: Path) -> Path:
+    return input_folder / FolderName.CARD_STATEMENTS.value

@@ -13,11 +13,13 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import zipfile
 from unittest.mock import MagicMock, patch
 
 from pathlib import Path
 
 import openpyxl
+import pytest
 
 from justifactu.bank_statement import (
     BankEntry,
@@ -28,6 +30,8 @@ from justifactu.bank_statement import (
     read_sap_id_ledger,
     Word,
     _merge_commission_rows,
+    _strip_autofilters,
+    find_year_ledger,
 )
 from justifactu.SAP_ID import SAP_ID
 
@@ -397,3 +401,91 @@ def test_merge_commission_rows_does_not_merge_across_different_dates():
     result = _merge_commission_rows([entry_a, commission_entry])
 
     assert result == [entry_a, commission_entry]
+
+
+# ── find_year_ledger ──────────────────────────────────────────────────────────
+
+
+def test_find_year_ledger_returns_single_ledger(tmp_path):
+    ledger = tmp_path / "Targetes_2026.xlsx"
+    ledger.touch()
+
+    assert find_year_ledger(tmp_path) == ledger
+
+
+def test_find_year_ledger_none_when_missing(tmp_path):
+    assert find_year_ledger(tmp_path) is None
+
+
+def test_find_year_ledger_none_when_more_than_one(tmp_path):
+    (tmp_path / "a.xlsx").touch()
+    (tmp_path / "b.xlsx").touch()
+
+    assert find_year_ledger(tmp_path) is None
+
+
+def test_find_year_ledger_ignores_excel_lock_file(tmp_path):
+    ledger = tmp_path / "Targetes_2026.xlsx"
+    ledger.touch()
+    (tmp_path / "~$Targetes_2026.xlsx").touch()
+
+    assert find_year_ledger(tmp_path) == ledger
+
+
+# ── _strip_autofilters ────────────────────────────────────────────────────────
+
+
+def _add_whole_row_autofilter(path: Path) -> None:
+    """Rewrites the sheet's AutoFilter to a whole-row range (ref="1:644"),
+    the shape Excel writes and openpyxl refuses to parse."""
+    workbook = openpyxl.load_workbook(path)
+    workbook.active.auto_filter.ref = "A1:J2"
+    workbook.save(path)
+
+    rewritten = path.with_suffix(".tmp")
+    with zipfile.ZipFile(path) as src, zipfile.ZipFile(rewritten, "w") as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename.startswith("xl/worksheets/"):
+                data = data.replace(
+                    b'<autoFilter ref="A1:J2"', b'<autoFilter ref="1:644"'
+                )
+            dst.writestr(item, data)
+    rewritten.replace(path)
+
+
+def test_whole_row_autofilter_breaks_plain_openpyxl(tmp_path):
+    ledger_path = tmp_path / "ledger.xlsx"
+    _make_ledger(
+        ledger_path,
+        [{"date": "01/01", "concept": "Compra", "total": 56.78, "sap_id": sap_id}],
+    )
+    _add_whole_row_autofilter(ledger_path)
+
+    with pytest.raises(ValueError):
+        openpyxl.load_workbook(ledger_path, data_only=True)
+
+
+def test_read_sap_id_ledger_reads_ledger_with_whole_row_autofilter(tmp_path):
+    ledger_path = tmp_path / "ledger.xlsx"
+    _make_ledger(
+        ledger_path,
+        [{"date": "01/01", "concept": "Compra", "total": 56.78, "sap_id": sap_id}],
+    )
+    _add_whole_row_autofilter(ledger_path)
+
+    assert read_sap_id_ledger(ledger_path) == {("0101", 56.78): SAP_ID(sap_id)}
+
+
+def test_strip_autofilters_leaves_original_file_untouched(tmp_path):
+    ledger_path = tmp_path / "ledger.xlsx"
+    _make_ledger(
+        ledger_path,
+        [{"date": "01/01", "concept": "Compra", "total": 56.78, "sap_id": sap_id}],
+    )
+    _add_whole_row_autofilter(ledger_path)
+    before = ledger_path.read_bytes()
+
+    _strip_autofilters(ledger_path)
+
+    assert ledger_path.read_bytes() == before

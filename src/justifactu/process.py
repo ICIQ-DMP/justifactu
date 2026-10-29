@@ -136,18 +136,17 @@ def merge_bills_and_card_statements(
     """Phase 3: matches remaining bills against card statements through each
     year's ledger, merging the bill with the whole statement. Statements and
     ledgers are never renamed or moved."""
-    if not cards_folder.is_dir():
-        log.warning(f"{cards_folder} is not a directory", extra={"qa_report": True})
-        return
-
     statement_by_sap: dict[SAP_ID, Path] = {}
-    for year_folder in sorted(p for p in cards_folder.iterdir() if p.is_dir()):
-        ledger_path = find_year_ledger(year_folder)
-        if ledger_path is None:
-            continue
-        for statement in sorted(year_folder.glob("*.pdf")):
-            for sap_id in index_statement_entries(statement, ledger_path):
-                statement_by_sap[sap_id] = statement
+    if cards_folder.is_dir():
+        for year_folder in sorted(p for p in cards_folder.iterdir() if p.is_dir()):
+            ledger_path = find_year_ledger(year_folder)
+            if ledger_path is None:
+                continue
+            for statement in sorted(year_folder.glob("*.pdf")):
+                for sap_id in index_statement_entries(statement, ledger_path):
+                    statement_by_sap[sap_id] = statement
+    else:
+        log.warning(f"{cards_folder} is not a directory", extra={"qa_report": True})
 
     for bill_path in list_dir(bills_folder):
         if bill_path.suffix.lower() != ".pdf":

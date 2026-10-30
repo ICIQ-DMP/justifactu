@@ -56,10 +56,10 @@ there is now a single parse and a single branch, both inside the one function:
   (`process.py`).
 
 `run_phase()` and `run_all_phases()` still share one dispatch table, so there's a single place defining what each
-phase does — `run_all_phases` loops `FULL_RUN_PHASES = (Phase.PHASE_1, Phase.PHASE_2)` against the same map
-`run_phase` looks a single key up in. Phase 3 (`mock_phase3`) is reachable via `--phase 3` for testing but
-deliberately excluded from `FULL_RUN_PHASES`, since it's a placeholder — don't add it to the full-run tuple until
-it's actually implemented.
+phase does — `run_all_phases` loops `FULL_RUN_PHASES = (Phase.PHASE_1, Phase.PHASE_2, Phase.PHASE_3)` against the
+same map `run_phase` looks a single key up in. Phase 3 (`merge_bills_and_card_statements`, see "Phase 3: card
+statements matched through a yearly ledger" below) replaced the old `mock_phase3` placeholder and is part of every
+full run. The order matters: Phase 3 only sees bills Phase 2 didn't consume.
 
 `main()` passes `args.runtime_location` (not `args.input_location`, which never existed as a CLI attribute) to
 `run_phase` — a prior mismatch between this call and what `arguments.py` actually produces was fixed in commit
@@ -164,8 +164,61 @@ parsed via regex from two different sources:
 
 `process.py::merge_bills_and_payments` matches bills against an index of already-renamed payment files, merges each
 matched pair into one PDF under `{year}_FACTURA+PAGAMENT/{sap_id}_F_P.pdf`, then (`cleanup_processed_files`) renames
-the payment with a `_merged` suffix and deletes the bill. An unmatched bill isn't necessarily an error — it's
-routed to a separate, not-yet-implemented "own treatment" flow (`mock_phase3`).
+the payment with a `_merged` suffix and deletes the bill. A bill with no direct payment isn't an error at this
+stage. Phase 2 only logs it at `info` level ("deferring to card statements") and leaves it in place for Phase 3. The
+QA error for a truly unmatched bill is raised by Phase 3, not Phase 2, so running `--phase 2` alone no longer
+QA-reports unmatched bills.
+
+### Phase 3: card statements matched through a yearly ledger
+
+Card payments never carry a SAP ID themselves. They're linked to one through a hand-maintained Excel ledger, one
+per year, that sits next to that year's bank/card statement PDFs:
+
+```text
+<runtime>/Targetes/                    # FolderName.CARD_STATEMENTS, paths.py::card_statements_folder
+└── <year>/                            # any subfolder name works; every subfolder is scanned
+    ├── <anything>.xlsx                # exactly ONE ledger per year folder (Excel "~$" lock files ignored)
+    └── <anything>.pdf                 # the statement PDFs, any filename
+```
+
+`process.py::merge_bills_and_card_statements` builds a `SAP_ID -> statement PDF` index across every year folder,
+then walks `FACTURES/`. Each bill whose SAP ID is in the index is merged with the **whole** statement PDF into the
+same `{year}_FACTURA+PAGAMENT/{sap_id}_F_P.pdf` output Phase 2 uses. The bill is deleted afterwards
+(`delete_processed = mode != Mode.DEV`). **Statements and ledgers are never renamed, moved or deleted.** One statement
+can back many bills, so it has to stay where it is.
+
+What `bank_statement.py` does, in order:
+
+- `extract_bank_entries` parses statement rows with pdfplumber's `extract_words()`, grouping words into rows by
+  `top` coordinate (`_group_into_rows`, tolerance 1.0). A row counts as a transaction only if its first word is a
+  4-digit `DDMM` date (`DATE_PATTERN`). The concept is every word left of `CONCEPT_COLUMN_END_X = 289`, and the
+  total is the last word matching `AMOUNT_PATTERN` (Spanish format, `1.234,56`). These coordinates/patterns are
+  tuned to the current bank's statement layout. A different bank's PDF will need them revisited.
+- `_merge_commission_rows`: a row whose concept starts with `COMMISSION_MARKER` ("Comissió per conversió de
+  divises") is the currency-conversion fee for the previous transaction. It's folded into that row (totals summed,
+  first concept kept), because the ledger records the two as a single amount.
+- `read_sap_id_ledger` reads columns A (date, `DD/MM` text, often with a leading `'` that gets stripped),
+  H (total) and J (SAP ID) from the active sheet, starting at row 2, into a `(DDMM, round(total, 2)) -> SAP_ID`
+  dict. Rows with an empty column J are skipped silently. A non-numeric total or an invalid SAP ID is QA-logged
+  and skipped.
+- `_strip_autofilters`: the real ledgers carry a whole-row AutoFilter (`<autoFilter ref="1:644"/>`) that openpyxl
+  refuses to load. The workbook is copied into memory with every `<autoFilter>` element removed from
+  `xl/worksheets/*.xml`. The file on disk is never modified.
+- `index_statement_entries` joins the two on `(date, total)`. The match key is deliberately date + amount only,
+  with no concept. A statement entry with no ledger row is QA-logged and skipped.
+- `find_year_ledger` returns the single `.xlsx` in a year folder. Zero or more than one is a QA error, and that
+  whole year folder is skipped.
+
+Only `.xlsx` ledgers are supported. `.xls` files are expected to be converted, not read.
+
+Idempotency: a bill whose output PDF already exists is skipped, so DEV mode (bills kept) can be re-run safely. A
+missing `Targetes/` folder is QA-warned but doesn't end the phase early. Every remaining bill still gets its
+"No matching payment or card statement found" QA error (`tests/test_process.py::
+test_phase_3_qa_logs_unmatched_bill_when_targetes_missing` guards this).
+
+Known costs: every statement is re-parsed and every ledger re-read on every run (once per statement). Every
+statement row without a ledger SAP ID is QA-logged again on every run, since statements never leave `Targetes/`.
+Two ledger rows with the same date and total collide, and the last one wins silently.
 
 ### SharePoint/Graph API code: back, but only as a download fallback
 
@@ -370,9 +423,9 @@ defaults). The `post` blocks call `make notify` (`notify.py`) rather than the Je
 - `sharepoint.py`: Graph API fallback for the OneDrive download step only — see "SharePoint/Graph API code" above.
   Not used for upload under any circumstance; `onedrive --upload-only` remains the only upload path.
 - `logger.py`: a `extra={"qa_report": True}` tag on any `log.*()` call routes that line into a separate QA report
-  file (mailed via `mail.py::send_qa_report_mail`), independent of the main run log. `GENERAL_OUTPUT_FOLDER`/
-  `ADMIN_LOG_FOLDER` compose from `FolderName.GENERAL_OUTPUT`/`ADMIN_LOGS` as of `64587cf` — see "Path and
-  folder-name composition" above for the bug this fixed.
+  file (mailed via `mail.py::send_qa_report_mail`), independent of the main run log. The `RichHandler` runs with
+  `markup=False`, and the `pdfminer`/`pdfplumber` loggers are pinned to `WARNING`. pdfminer's debug messages contain
+  `[...]` sequences that Rich tried to parse as markup and crashed on (`MarkupError`) during Phase 3.
 - `secret.py` / `vault.py`: secrets resolve through a fallback chain (mounted Docker secret → `default_secrets_folder()`
   → env var → HashiCorp Vault), so the same code runs unmodified in local dev and deployed containers. `vault.py`'s
   `_SECRET_MAP` is the authoritative list of which `SecretNames` values actually have a Vault path configured.
@@ -380,3 +433,5 @@ defaults). The `post` blocks call `make notify` (`notify.py`) rather than the Je
   notification email with optional attachments — calls `mail.py::send_mail_authenticated` directly and lets
   exceptions propagate, unlike `main()`'s own QA-mail call which swallows failures. Used by the `Jenkinsfile`'s
   `post { failure }`/`post { aborted }` blocks instead of the Jenkins `emailext` step.
+- `bank_statement.py`: Phase 3's statement parsing and ledger reading. See "Phase 3: card statements matched
+  through a yearly ledger" above. `process.py` only calls `find_year_ledger` and `index_statement_entries`.

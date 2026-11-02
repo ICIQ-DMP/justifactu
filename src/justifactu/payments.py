@@ -38,13 +38,6 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
 
     for filename, payment_path in folder_map.items():
 
-        if payment_path.suffix.lower() != ".pdf":
-            log.warning(
-                f"Skipping {payment_path} because it is not a PDF",
-                extra={"qa_report": True},
-            )
-            continue
-
         if payment_path.stem.endswith(FileSuffix.PROCESSED_PAYMENT.value):
             log.info(f"Skipping {payment_path} because it is already processed")
             continue

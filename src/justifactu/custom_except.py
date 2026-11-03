@@ -39,3 +39,7 @@ class MainCriticalError(Exception):
 
 class VaultSecretEmpty(Exception):
     """Raised when secret is empty."""
+
+
+class NotAPaymentFileError(Exception):
+    """Raised when a file in the payments folder is not a PDF."""

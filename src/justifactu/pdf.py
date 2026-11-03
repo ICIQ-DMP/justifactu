@@ -17,19 +17,31 @@
 from pathlib import Path
 
 from pypdf import PdfWriter
+from pypdf.errors import PyPdfError
 
 
+from .custom_except import MergingBillWithPaymentError
 from .logger import get_logger
 
 log = get_logger(__name__)
 
 
 def merge_pdfs(first_pdf: Path, second_pdf: Path, output_path: Path) -> None:
-    """Merges two PDF files into output_path"""
-    writer = PdfWriter()
-    writer.append(first_pdf)
-    writer.append(second_pdf)
+    """Merges two PDF files into output_path.
 
-    with open(output_path, "wb") as f:
-        writer.write(f)
-        writer.close()
+    Raises MergingBillWithPaymentError if either PDF can't be read or the
+    output can't be written. A partially written output is removed, so a
+    later run doesn't mistake it for a finished merge."""
+    try:
+        writer = PdfWriter()
+        writer.append(first_pdf)
+        writer.append(second_pdf)
+
+        with open(output_path, "wb") as f:
+            writer.write(f)
+            writer.close()
+    except (PyPdfError, OSError) as e:
+        output_path.unlink(missing_ok=True)
+        raise MergingBillWithPaymentError(
+            f"Could not merge {first_pdf.name} with {second_pdf.name}: {e}"
+        ) from e

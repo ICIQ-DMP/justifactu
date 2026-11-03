@@ -30,3 +30,16 @@ def test_qa_report_captures_tagged_records_at_any_level(tmp_path):
     assert "tagged warning" in content
     assert "tagged error" in content
     assert "untagged error" not in content
+
+
+def test_qa_report_captures_tagged_info_records(tmp_path):
+    qa_report_path = tmp_path / "qa_report.log"
+    configure_logging_from_settings(qa_files_log_file=qa_report_path)
+    log = get_logger("test_qa_report")
+
+    log.info("tagged info", extra={"qa_report": True})
+    log.info("untagged info")
+
+    content = qa_report_path.read_text()
+    assert "tagged info" in content
+    assert "untagged info" not in content

@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+import time
 
 from justifactu.onedrive_sync import (
     run_onedrive_sync,
@@ -39,7 +40,7 @@ from justifactu.logger import (
 )
 from justifactu.filesystem import copy_file
 from justifactu.mail import send_qa_report_mail
-from justifactu.process import run_all_phases, run_phase
+from justifactu.process import log_run_summary, run_all_phases, run_phase
 from justifactu.custom_except import MainCriticalError
 from justifactu.secret import read_secret
 from justifactu.sharepoint import connect_sharepoint, download_input_folder
@@ -51,10 +52,12 @@ def main() -> None:
     """"""
     qa_report_path = LOGS_FOLDER / (NOW + "_qa_report.log")
     configure_logging_from_settings(qa_files_log_file=qa_report_path)
+    started_at = time.monotonic()  # NEW
 
     args = process_parse_arguments()
     if args.phase is not None:
-        run_phase(args.phase, args.runtime_location, args.mode)
+        metrics = run_phase(args.phase, args.runtime_location, args.mode)  # CHANGED
+        log_run_summary(metrics, time.monotonic() - started_at)  # NEW
         return
 
     confdir = args.onedrive_conf_folder
@@ -98,7 +101,9 @@ def main() -> None:
                     f"Graph API fallback download also failed: {fallback_error}"
                 ) from fallback_error
 
-        run_all_phases(args.runtime_location, args.mode)
+        metrics = run_all_phases(args.runtime_location, args.mode)  # CHANGED
+        # Logged before the QA report is copied, so the uploaded copy has it too.
+        log_run_summary(metrics, time.monotonic() - started_at)  # NEW
 
         bills_plus_payments_folder = merged_bills_and_payments_folder(
             args.runtime_location

@@ -16,21 +16,22 @@
 import re
 from pathlib import Path
 
-from .SAP_ID import SAP_ID, parse_sap_id_from_string
-from .filesystem import change_file_name
-from .logger import get_logger
-
-
 from pypdf import PdfReader
 from pypdf.errors import DependencyError, PyPdfError
 
-from .custom_except import (
-    ParseSAPIdException,
-)
+from .SAP_ID import SAP_ID, parse_sap_id_from_string
 from .SAP_ID import pattern as SAP_pattern
+from .custom_except import NotAPaymentFileError, ParseSAPIdException
 from .defines import FileSuffix
+from .filesystem import change_file_name
+from .logger import get_logger
 
 log = get_logger(__name__)
+
+# Matches payments already handled by an earlier run: {sap_id}-P or {sap_id}-P_merged
+RENAMED_PAYMENT_PATTERN = re.compile(
+    SAP_pattern + r"-P(" + re.escape(FileSuffix.PROCESSED_PAYMENT.value) + r")?$"
+)
 
 
 def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
@@ -52,44 +53,21 @@ def index_payments(folder_map: dict[str, Path]) -> dict[SAP_ID, Path]:
     return payment_map
 
 
-def rename_payments(
-    pdf_path: Path,
-) -> dict[SAP_ID, Path]:
-    """Renames the files from the payments folder, returning a SAP ID -> local path
-    map for the files renamed in this run (so matching doesn't have to wait for
-    the local mirror to catch up)."""
-    if not pdf_path.is_dir():
-        log.warning(f"{pdf_path} is not a directory")
+def is_renamed_payment(path: Path) -> bool:
+    """Whether a payment file was already renamed by an earlier run."""
+    return RENAMED_PAYMENT_PATTERN.search(path.stem) is not None
 
-    renamed_this_run: dict[SAP_ID, Path] = {}
 
-    rename_pattern = re.compile(
-        SAP_pattern + r"-P(" + re.escape(FileSuffix.PROCESSED_PAYMENT.value) + r")?$"
-    )
-    for entry in list(pdf_path.rglob("*")):
-        if entry.is_dir():
-            continue
+def rename_payment(payment_path: Path) -> Path:
+    """Renames one payment file to {sap_id}-P in place, returning the new path.
 
-        if rename_pattern.search(entry.stem):
-            continue
+    Raises NotAPaymentFileError for non-PDF files, and ParseSAPIdException
+    when no SAP ID can be read from the PDF."""
+    if payment_path.suffix.lower() != ".pdf":
+        raise NotAPaymentFileError(f"{payment_path} is not a PDF file")
 
-        if entry.suffix.lower() != ".pdf":
-            log.warning(
-                f"Skipping file {entry}: non-PDF file", extra={"qa_report": True}
-            )
-            continue
-
-        try:
-            log.info(f"Renaming: {entry.name}...")
-
-            sap_id = parse_sap_id_from_payment(entry)
-            renamed_path = change_file_name(entry, f"{sap_id}-P")
-            renamed_this_run[SAP_ID(sap_id)] = renamed_path
-
-        except (ParseSAPIdException, FileNotFoundError) as e:
-            log.error(f"Failed to rename {entry}: {e}", extra={"qa_report": True})
-
-    return renamed_this_run
+    sap_id = parse_sap_id_from_payment(payment_path)
+    return change_file_name(payment_path, f"{sap_id}-P")
 
 
 def parse_sap_id_from_payment(pdf_path: Path) -> str:

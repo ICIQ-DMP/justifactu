@@ -16,16 +16,24 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
-from justifactu.defines import FileSuffix, FolderName
+from justifactu.custom_except import (
+    MergingBillWithPaymentError,
+    NotAPaymentFileError,
+    ParseSAPIdException,
+)
+from justifactu.defines import FileSuffix, FolderName, Metric
 from justifactu.payments import (
     index_payments,
-    rename_payments,
+    rename_payment,
 )
 from justifactu.process import (
     cleanup_processed_files,
     merge_bills_and_payments,
+    rename_payments,
 )
 from justifactu.filesystem import index_folder
 from justifactu.pdf import (
@@ -131,6 +139,19 @@ def test_merge_pdfs_output_has_two_pages(tmp_path):
     assert len(reader.pages) == 2
 
 
+def test_merge_pdfs_raises_and_leaves_no_output_on_corrupt_input(tmp_path):
+    first = tmp_path / "first.pdf"
+    corrupt = tmp_path / "corrupt.pdf"
+    output = tmp_path / "merged.pdf"
+    create_blank_pdf(first)
+    corrupt.write_bytes(b"not a pdf")
+
+    with pytest.raises(MergingBillWithPaymentError):
+        merge_pdfs(first, corrupt, output)
+
+    assert not output.exists()
+
+
 # ── cleanup_processed_files ───────────────────────────────────────────────────
 
 
@@ -174,12 +195,12 @@ def test_rename_payments_renames_pdf(tmp_path):
         "justifactu.payments.parse_sap_id_from_payment",
         return_value=str(id_sap_instance),
     ):
-        result = rename_payments(payments_dir)
+        metrics = rename_payments(payments_dir)
 
     renamed_pdf = payments_dir / f"{id_sap_instance}-P.pdf"
     assert renamed_pdf.exists()
     assert not pdf.exists()
-    assert result[id_sap_instance] == renamed_pdf
+    assert sum(metrics.values()) == 0
 
 
 def test_rename_payments_skips_already_renamed(tmp_path):
@@ -204,6 +225,74 @@ def test_rename_payments_skips_non_pdf(tmp_path):
         mock_parse.assert_not_called()
 
 
+def test_rename_payments_counts_non_pdf_files(tmp_path):
+    payments_dir = tmp_path / FolderName.PAYMENTS.value
+    payments_dir.mkdir()
+    (payments_dir / "document.txt").touch()
+    (payments_dir / "Thumbs.db").touch()
+
+    metrics = rename_payments(payments_dir)
+
+    assert metrics[Metric.TRASH_FILES] == 2
+    assert metrics[Metric.UNPARSEABLE_PAYMENTS] == 0
+
+
+def test_rename_payments_counts_unparseable_pdfs(tmp_path):
+    payments_dir = tmp_path / FolderName.PAYMENTS.value
+    payments_dir.mkdir()
+    create_blank_pdf(payments_dir / "no_sap_id.pdf")
+
+    with patch(
+        "justifactu.payments.parse_sap_id_from_payment",
+        side_effect=ParseSAPIdException("no SAP ID"),
+    ):
+        metrics = rename_payments(payments_dir)
+
+    assert metrics[Metric.UNPARSEABLE_PAYMENTS] == 1
+    assert metrics[Metric.TRASH_FILES] == 0
+
+
+def test_rename_payments_missing_folder_returns_no_metrics(tmp_path):
+    assert rename_payments(tmp_path / "missing") == {}
+
+
+# ── rename_payment ────────────────────────────────────────────────────────────
+
+
+def test_rename_payment_returns_new_path(tmp_path):
+    pdf = tmp_path / "bank_statement.pdf"
+    create_blank_pdf(pdf)
+
+    with patch(
+        "justifactu.payments.parse_sap_id_from_payment",
+        return_value=str(id_sap_instance),
+    ):
+        renamed = rename_payment(pdf)
+
+    assert renamed == tmp_path / f"{id_sap_instance}-P.pdf"
+    assert renamed.exists()
+
+
+def test_rename_payment_raises_for_non_pdf(tmp_path):
+    txt_file = tmp_path / "document.txt"
+    txt_file.touch()
+
+    with pytest.raises(NotAPaymentFileError):
+        rename_payment(txt_file)
+
+    assert txt_file.exists()
+
+
+def test_rename_payment_raises_when_sap_id_missing(tmp_path):
+    pdf = tmp_path / "bank_statement.pdf"
+    create_blank_pdf(pdf)
+
+    with pytest.raises(ParseSAPIdException):
+        rename_payment(pdf)
+
+    assert pdf.exists()
+
+
 # ── merge_bills_and_payments ──────────────────────────────────────────────────
 
 
@@ -225,6 +314,35 @@ def test_merge_bills_and_payments_success(billing_dirs):
         / f"{id_sap_instance}{FileSuffix.MERGED_BILL_PAYMENT.value}.pdf"
     )
     assert expected_output.exists()
+
+
+def test_merge_bills_and_payments_counts_merges(billing_dirs):
+    bills_dir, payments_dir, output_dir = billing_dirs
+    create_blank_pdf(bills_dir / f"F {id_sap_instance}.pdf")
+    create_blank_pdf(payments_dir / f"{id_sap_instance}-P.pdf")
+    create_blank_pdf(bills_dir / "F 2034000001.pdf")  # no payment: not a merge
+
+    metrics = merge_bills_and_payments(bills_dir, payments_dir, output_dir)
+
+    assert metrics[Metric.PAYMENT_MERGES] == 1
+    assert metrics[Metric.UNMATCHED_BILLS] == 0  # decided by phase 3, not here
+
+
+def test_merge_bills_and_payments_counts_failed_merge_and_keeps_files(billing_dirs):
+    bills_dir, payments_dir, output_dir = billing_dirs
+    bill = bills_dir / f"F {id_sap_instance}.pdf"
+    payment = payments_dir / f"{id_sap_instance}-P.pdf"
+    create_blank_pdf(bill)
+    payment.write_bytes(b"not a pdf")
+
+    metrics = merge_bills_and_payments(
+        bills_dir, payments_dir, output_dir, delete_processed=True
+    )
+
+    assert metrics[Metric.FAILED_MERGES] == 1
+    assert metrics[Metric.PAYMENT_MERGES] == 0
+    assert bill.exists()
+    assert payment.exists()  # not renamed to _merged
 
 
 def test_merge_bills_and_payments_no_matching_payment(billing_dirs):

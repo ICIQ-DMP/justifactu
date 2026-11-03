@@ -14,6 +14,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+from collections import Counter
+from datetime import timedelta
 from pathlib import Path
 from typing import Callable
 
@@ -22,10 +24,11 @@ from .bank_statement import find_year_ledger, index_statement_entries
 from .bills import parse_bill_filename
 from .custom_except import (
     MergingBillWithPaymentError,
+    NotAPaymentFileError,
     ParseSAPIdException,
 )
 
-from .defines import FileSuffix, Phase, Mode
+from .defines import FileSuffix, Metric, Phase, Mode
 from .paths import (
     bills_folder,
     payments_folder,
@@ -36,10 +39,39 @@ from .paths import (
 )
 from .filesystem import list_dir, index_folder, change_file_name
 from .logger import get_logger
-from .payments import index_payments, rename_payments
+from .payments import index_payments, is_renamed_payment, rename_payment
 from .pdf import merge_pdfs
 
 log = get_logger(__name__)
+
+Metrics = Counter[Metric]
+
+
+def rename_payments(payments_folder: Path) -> Metrics:
+    """Phase 1: renames every payment PDF in payments_folder (recursively) to
+    {sap_id}-P, in place. Files already renamed by an earlier run are skipped."""
+    metrics: Metrics = Counter()
+    if not payments_folder.is_dir():
+        log.warning(f"{payments_folder} is not a directory")
+        return metrics
+
+    for entry in list(payments_folder.rglob("*")):
+        if entry.is_dir() or is_renamed_payment(entry):
+            continue
+
+        try:
+            log.info(f"Renaming: {entry.name}...")
+            rename_payment(entry)
+        except NotAPaymentFileError as e:
+            log.warning(f"Skipping file: {e}", extra={"qa_report": True})
+            metrics[Metric.TRASH_FILES] += 1
+        except ParseSAPIdException as e:
+            log.error(f"Failed to rename {entry}: {e}", extra={"qa_report": True})
+            metrics[Metric.UNPARSEABLE_PAYMENTS] += 1
+        except FileNotFoundError as e:
+            log.error(f"Failed to rename {entry}: {e}", extra={"qa_report": True})
+
+    return metrics
 
 
 def merge_bills_and_payments(
@@ -48,15 +80,15 @@ def merge_bills_and_payments(
     merge_folder: Path,
     delete_processed: bool = False,
     freshly_renamed_payments: dict[SAP_ID, Path] | None = None,
-) -> None:
-    """Merges bills and payments and saves them into merge_folder"""
+) -> Metrics:
+    """Phase 2: merges bills and payments and saves them into merge_folder"""
+    metrics: Metrics = Counter()
 
     merge_folder.mkdir(parents=True, exist_ok=True)
     payment_map = {
         **index_payments(index_folder(payments_folder)),
         **(freshly_renamed_payments or {}),
     }
-    successful_payments: set[Path] = set()
     qa_folder = qa_errors_folder(merge_folder)
     qa_folder.mkdir(parents=True, exist_ok=True)
 
@@ -95,15 +127,17 @@ def merge_bills_and_payments(
         try:
             log.info(f"Merging {bill_path.name} with {matched_payment.name}...")
             merge_pdfs(bill_path, matched_payment, output_path)
-            successful_payments.add(matched_payment)
-
-            cleanup_processed_files(
-                bill_path,
-                matched_payment,
-                delete_processed,
-            )
         except MergingBillWithPaymentError as e:
-            log.exception(f"Failed to process {bill_path.name}: {e}")
+            log.error(
+                f"Failed to process {bill_path.name}: {e}", extra={"qa_report": True}
+            )
+            metrics[Metric.FAILED_MERGES] += 1
+            continue
+
+        metrics[Metric.PAYMENT_MERGES] += 1
+        cleanup_processed_files(bill_path, matched_payment, delete_processed)
+
+    return metrics
 
 
 def cleanup_processed_files(
@@ -132,10 +166,12 @@ def merge_bills_and_card_statements(
     cards_folder: Path,
     merge_folder: Path,
     delete_processed: bool = False,
-) -> None:
+) -> Metrics:
     """Phase 3: matches remaining bills against card statements through each
     year's ledger, merging the bill with the whole statement. Statements and
     ledgers are never renamed or moved."""
+    metrics: Metrics = Counter()
+
     statement_by_sap: dict[SAP_ID, Path] = {}
     if cards_folder.is_dir():
         for year_folder in sorted(p for p in cards_folder.iterdir() if p.is_dir()):
@@ -169,6 +205,7 @@ def merge_bills_and_card_statements(
                 f"No matching payment or card statement found for bill {bill_path}",
                 extra={"qa_report": True},
             )
+            metrics[Metric.UNMATCHED_BILLS] += 1
             continue
 
         output_folder_path.mkdir(parents=True, exist_ok=True)
@@ -177,11 +214,19 @@ def merge_bills_and_card_statements(
                 f"Merging {bill_path.name} with card statement {matched_statement.name}..."
             )
             merge_pdfs(bill_path, matched_statement, output_path)
-            if delete_processed:
-                bill_path.unlink(missing_ok=True)
-                log.info(f"Deleted: {bill_path.name}")
         except MergingBillWithPaymentError as e:
-            log.exception(f"Failed to process {bill_path.name}: {e}")
+            log.error(
+                f"Failed to process {bill_path.name}: {e}", extra={"qa_report": True}
+            )
+            metrics[Metric.FAILED_MERGES] += 1
+            continue
+
+        metrics[Metric.CARD_STATEMENT_MERGES] += 1
+        if delete_processed:
+            bill_path.unlink(missing_ok=True)
+            log.info(f"Deleted: {bill_path.name}")
+
+    return metrics
 
 
 def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
@@ -192,26 +237,28 @@ def _phase_folders(input_folder: Path) -> tuple[Path, Path, Path]:
     )
 
 
-def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[], None]]:
+def _build_phase_map(
+    input_folder: Path, mode: Mode
+) -> dict[Phase, Callable[[], Metrics]]:
     bills_folder_path, payments_folder_path, bills_plus_payments_folder = (
         _phase_folders(input_folder)
     )
 
-    def _run_phase_1() -> None:
-        rename_payments(payments_folder_path)
+    def _run_phase_1() -> Metrics:
+        return rename_payments(payments_folder_path)
 
-    def _run_phase_2() -> None:
+    def _run_phase_2() -> Metrics:
         # Bills are deleted after a successful merge in PROD and TEST, but kept in DEV
         # so local test fixtures survive repeated runs.
-        merge_bills_and_payments(
+        return merge_bills_and_payments(
             bills_folder_path,
             payments_folder_path,
             bills_plus_payments_folder,
             delete_processed=mode != Mode.DEV,
         )
 
-    def _run_phase_3() -> None:
-        merge_bills_and_card_statements(
+    def _run_phase_3() -> Metrics:
+        return merge_bills_and_card_statements(
             bills_folder_path,
             card_statements_folder(input_folder),
             bills_plus_payments_folder,
@@ -225,14 +272,36 @@ def _build_phase_map(input_folder: Path, mode: Mode) -> dict[Phase, Callable[[],
     }
 
 
-def run_phase(phase: Phase, input_folder: Path, mode: Mode) -> None:
-    _build_phase_map(input_folder, mode)[phase]()
+def run_phase(phase: Phase, input_folder: Path, mode: Mode) -> Metrics:
+    return _build_phase_map(input_folder, mode)[phase]()
 
 
 FULL_RUN_PHASES: tuple[Phase, ...] = (Phase.PHASE_1, Phase.PHASE_2, Phase.PHASE_3)
 
 
-def run_all_phases(input_folder: Path, mode: Mode) -> None:
+def run_all_phases(input_folder: Path, mode: Mode) -> Metrics:
     phase_map = _build_phase_map(input_folder, mode)
+    metrics: Metrics = Counter()
     for phase in FULL_RUN_PHASES:
-        phase_map[phase]()
+        metrics.update(phase_map[phase]())
+    return metrics
+
+
+def log_run_summary(metrics: Metrics, elapsed_seconds: float) -> None:
+    """Writes the run summary into the QA report. Missing counters read as 0."""
+    payment_merges = metrics[Metric.PAYMENT_MERGES]
+    card_merges = metrics[Metric.CARD_STATEMENT_MERGES]
+    summary = "\n".join(
+        [
+            "Run summary",
+            f"  Execution time: {timedelta(seconds=round(elapsed_seconds))}",
+            f"  Bill/payment merges completed: {payment_merges + card_merges} "
+            f"({payment_merges} bank payment, {card_merges} card statement)",
+            f"  Failed merges: {metrics[Metric.FAILED_MERGES]}",
+            f"  Bills with no matching payment: {metrics[Metric.UNMATCHED_BILLS]}",
+            f"  Non-payment files in Remeses: {metrics[Metric.TRASH_FILES]}",
+            "  Payment files with unparseable SAP ID: "
+            f"{metrics[Metric.UNPARSEABLE_PAYMENTS]}",
+        ]
+    )
+    log.info(summary, extra={"qa_report": True})

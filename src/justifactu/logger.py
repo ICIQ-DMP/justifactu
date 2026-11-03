@@ -172,7 +172,7 @@ def setup_logging(
         moved_handler.setFormatter(common_formatter)
         moved_handler.addFilter(secrets_filter)
         moved_handler.addFilter(qa_files_filter)
-        moved_handler.setLevel(logging.WARNING)
+        moved_handler.setLevel(logging.INFO)
         handlers.append(moved_handler)
 
     logging.basicConfig(

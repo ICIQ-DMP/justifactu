@@ -13,6 +13,7 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
+from collections import Counter
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -20,16 +21,19 @@ import pytest
 
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID
-from justifactu.defines import FileSuffix, Mode, Phase
+from justifactu.defines import FileSuffix, Mode, Phase, Metric
 from justifactu.paths import (
     bills_folder,
     card_statements_folder,
     merged_bills_and_payments_folder,
     year_merged_folder,
 )
+from justifactu.logger import configure_logging_from_settings
 from justifactu.process import (
     FULL_RUN_PHASES,
+    log_run_summary,
     merge_bills_and_card_statements,
+    run_all_phases,
     run_phase,
 )
 
@@ -217,3 +221,103 @@ def test_run_phase_3_delete_processed_depends_on_mode(
         run_phase(Phase.PHASE_3, tmp_path, mode)
 
     assert mock_merge.call_args.kwargs["delete_processed"] is expected_delete_processed
+
+
+# ── run metrics ──────────────────────────────────────────────────────────────
+
+
+def test_phase_3_counts_merges_and_unmatched_bills(tmp_path):
+    bills_dir, _, _, merge_dir = _card_layout(tmp_path)
+    create_blank_pdf(bills_dir / f"F {CARD_SAP_ID}.pdf")
+    create_blank_pdf(bills_dir / "F 2026000999.pdf")  # not in any statement
+
+    with patch(
+        "justifactu.process.index_statement_entries",
+        return_value={CARD_SAP_ID: MagicMock()},
+    ):
+        metrics = merge_bills_and_card_statements(
+            bills_dir,
+            card_statements_folder(tmp_path),
+            merge_dir,
+            delete_processed=True,
+        )
+
+    assert metrics[Metric.CARD_STATEMENT_MERGES] == 1
+    assert metrics[Metric.UNMATCHED_BILLS] == 1
+
+
+def test_phase_3_counts_failed_merge_and_keeps_bill(tmp_path):
+    bills_dir, _, statement, merge_dir = _card_layout(tmp_path)
+    bill = bills_dir / f"F {CARD_SAP_ID}.pdf"
+    create_blank_pdf(bill)
+    statement.write_bytes(b"not a pdf")
+
+    with patch(
+        "justifactu.process.index_statement_entries",
+        return_value={CARD_SAP_ID: MagicMock()},
+    ):
+        metrics = merge_bills_and_card_statements(
+            bills_dir,
+            card_statements_folder(tmp_path),
+            merge_dir,
+            delete_processed=True,
+        )
+
+    assert metrics[Metric.FAILED_MERGES] == 1
+    assert bill.exists()
+    assert not _expected_output(merge_dir, CARD_SAP_ID).exists()
+
+
+def test_run_all_phases_adds_up_every_phase(tmp_path):
+    with (
+        patch(
+            "justifactu.process.rename_payments",
+            return_value=Counter({Metric.TRASH_FILES: 2}),
+        ),
+        patch(
+            "justifactu.process.merge_bills_and_payments",
+            return_value=Counter({Metric.PAYMENT_MERGES: 3}),
+        ),
+        patch(
+            "justifactu.process.merge_bills_and_card_statements",
+            return_value=Counter(
+                {Metric.CARD_STATEMENT_MERGES: 1, Metric.UNMATCHED_BILLS: 4}
+            ),
+        ),
+    ):
+        metrics = run_all_phases(tmp_path, Mode.TEST)
+
+    assert metrics == Counter(
+        {
+            Metric.TRASH_FILES: 2,
+            Metric.PAYMENT_MERGES: 3,
+            Metric.CARD_STATEMENT_MERGES: 1,
+            Metric.UNMATCHED_BILLS: 4,
+        }
+    )
+
+
+def test_log_run_summary_is_written_to_qa_report(tmp_path):
+    qa_report_path = tmp_path / "qa_report.log"
+    configure_logging_from_settings(qa_files_log_file=qa_report_path)
+    metrics = Counter(
+        {
+            Metric.PAYMENT_MERGES: 3,
+            Metric.CARD_STATEMENT_MERGES: 2,
+            Metric.UNMATCHED_BILLS: 4,
+            Metric.TRASH_FILES: 1,
+            Metric.UNPARSEABLE_PAYMENTS: 6,
+        }
+    )
+
+    log_run_summary(metrics, elapsed_seconds=3725.4)
+
+    content = qa_report_path.read_text()
+    assert "Execution time: 1:02:05" in content
+    assert (
+        "Bill/payment merges completed: 5 (3 bank payment, 2 card statement)" in content
+    )
+    assert "Failed merges: 0" in content  # missing counters read as 0
+    assert "Bills with no matching payment: 4" in content
+    assert "Non-payment files in Remeses: 1" in content
+    assert "Payment files with unparseable SAP ID: 6" in content

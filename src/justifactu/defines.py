@@ -87,6 +87,17 @@ class FileSuffix(StrEnum):
     YEAR_FOLDER_SUFFIX = "_FACTURA+PAGAMENT"
 
 
+class Metric(StrEnum):
+    """Counters reported in the run summary at the end of the QA report."""
+
+    PAYMENT_MERGES = "payment_merges"
+    CARD_STATEMENT_MERGES = "card_statement_merges"
+    FAILED_MERGES = "failed_merges"
+    UNMATCHED_BILLS = "unmatched_bills"
+    TRASH_FILES = "trash_files"
+    UNPARSEABLE_PAYMENTS = "unparseable_payments"
+
+
 class SecretNames(StrEnum):
     """Available secret names."""
 

@@ -22,10 +22,10 @@ from rich.logging import RichHandler
 from .defines import ROOT_FOLDER, NOW, FolderName
 
 # ---- extend the logging module with TRACE
-DATE_FORMAT = "%d/%m/%Y"
+DATE_FORMAT = "%d/%m/%Y %H:%M:%S"
 TRACE_LEVEL_NUM = 1
 logging.addLevelName(TRACE_LEVEL_NUM, "TRACE")
-MESSAGE_FORMAT = "%(asctime)s | %(levelname)s | %(name)s | %(message)s"
+MESSAGE_FORMAT = "%(asctime)s.%(msecs)03d | %(levelname)s | %(name)s | %(message)s"
 LOGS_FOLDER: Path = ROOT_FOLDER / FolderName.LOGS.value
 
 

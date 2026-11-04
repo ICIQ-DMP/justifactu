@@ -11,6 +11,9 @@ dependencies = [
     "cryptography",
     "rich",
     "requests",
+    "types-openpyxl",
+    "openpyxl",
+    "pdfplumber"
 ]
 
 

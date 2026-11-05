@@ -12,7 +12,8 @@ All development commands are defined once in the `Makefile` and reused by pre-co
     make fmt                        # black src tests && ruff check --fix .
     make test                       # PYTHONPATH=src pytest -s -v   (testpaths = tests, per pyproject.toml)
     make run CMD="--phase 1"        # python -m justifactu <CMD>; CMD defaults to --help if omitted
-    make run CMD="--mode prod"      # same, but read from the production FACTURES/Remeses folders instead of test ones
+    make run CMD="--mode prod"      # full run against justifactu/runtime instead of justifactu/runtime-test
+    make auth                       # one-time OneDrive OAuth bootstrap (python -m justifactu --auth)
     make notify CMD="--subject '...' --body '...'"   # python -m justifactu.notify <CMD>; standalone one-off email
 
 Run a single test file or test function directly with pytest (bypassing the Makefile), same env var the `test`
@@ -21,417 +22,276 @@ target uses:
     PYTHONPATH=src pytest tests/test_bills.py -v
     PYTHONPATH=src pytest tests/test_bills.py::test_parse_bill_filename_valid -v
 
+`tests/test_mail.py::test_send_mail_authenticated_real` sends a real email and fails wherever the SMTP secrets
+aren't available. That's the expected baseline, not a regression.
+
 Docker (app image): `make docker-build` / `make docker-push` (pushes `davidromeroiciq/justifactu:latest`). Root
-`compose.yml` runs the app alongside a long-running `onedrive --monitor` sidecar for local dev — this is the *old*
-sync architecture (see "OneDrive sync" below), kept for local dev convenience only, not the production design.
+`compose.yml` runs the app alongside a long-running `onedrive --monitor` sidecar. That's the *old* sync
+architecture, local-dev only, and currently out of date (its `app` service still passes `--input-location`, a flag
+that no longer exists).
 
 Docker (Jenkins agent image): `make prodbuild` / `make prodrun` build and start the agent defined in
-`service/agent/`, via `service/agent/compose.yml` — a separate image/compose file from the app's own, carrying the
-`onedrive` binary and SSH-agent setup for Jenkins to drive builds on. See "Jenkins agent" below.
+`service/agent/`, via `service/agent/compose.yml`. See "Jenkins agent" below.
 
 Git commit messages must follow Conventional Commits (enforced by `conventional-pre-commit` in
 `.pre-commit-config.yaml`); a license header (`LICENSE_HEADER`) is auto-inserted into `.py` files before formatting.
 
-All CLI flags use hyphens (`--onedrive-data-folder`, `--sharepoint-sync-folder`), not underscores — argparse maps
-both the same way internally (`args.onedrive_data_folder`), but only the hyphenated spelling is registered, so the
-underscored form will not be recognized on the command line.
+All CLI flags use hyphens (`--onedrive-data-folder`, `--sharepoint-sync-folder`), not underscores. argparse maps
+both to the same attribute (`args.onedrive_data_folder`), but only the hyphenated spelling is registered.
 
 ## Architecture
 
-### One entry path, not two
+### `main()` is the only entry path
 
-`src/justifactu/__main__.py` is now just a thin wrapper with no logic of its own — `from justifactu.main import
-main` followed by `if __name__ == "__main__": main()`. As of commits `8b8d57d`/`69d4a89`, the CLI-arg parsing and
-the `--phase` branch that used to live in `__main__.py` were both moved directly into `main()` (`main.py`), so
-there is now a single parse and a single branch, both inside the one function:
+`__main__.py` is a thin wrapper around `main.py::main()`. `main()` does, in order:
 
-- `args = process_parse_arguments()` runs first, unconditionally.
-- `--phase` **present** (`1`, `2`, or `3` — see `Phase` enum in `defines.py`) → `run_phase(args.phase,
-  args.runtime_location, args.mode)` runs via `process.py::_build_phase_map`'s dispatch dict, then `main()` returns
-  immediately. This path exists to test one stage in isolation without touching the rest of the pipeline — no
-  OneDrive sync, no `--auth` check. (`run_phase` gained the third `mode` argument in commit `64587cf` — see "Path
-  and folder-name composition" below.)
-- `--phase` **absent** → execution falls through into the full production pipeline: the `--auth` bootstrap check,
-  the OneDrive download/upload sync (see below), and `run_all_phases(args.runtime_location, args.mode)`
-  (`process.py`).
+1. Configures logging (run log + QA report under the repo's `logs/` folder) and records `started_at`.
+2. `args = process_parse_arguments()`.
+3. **`--phase` present** (`1`/`2`/`3`) → `run_phase(args.phase, args.runtime_location, args.mode)`, then
+   `log_run_summary(...)`, then `return`. No OneDrive sync, no `--auth` check, no log copy, no QA-report email.
+   This path exists to test one phase in isolation.
+4. **`--auth`** (with `--location sharepoint`, the default) → `run_onedrive_auth(...)`, then `return`.
+5. **Full run**, inside `try`:
+   - OneDrive download (`run_onedrive_sync(direction="download")`), with a Graph API fallback on failure.
+   - `metrics = run_all_phases(args.runtime_location, args.mode)` + `log_run_summary(metrics, elapsed)`.
+   - Copies the QA report into `FACTURES+PAGAMENTS/QA_ERRORS/` and the run log into `FACTURES+PAGAMENTS/logs/`.
+     The summary is logged *before* this copy so the uploaded QA report contains it.
+   - OneDrive upload (`run_onedrive_sync(direction="upload")`), no fallback.
+6. `except MainCriticalError` → `log.critical` + `exit(1)`. `finally` → `send_qa_report_mail(...)`, whose own
+   failures are logged and swallowed.
 
-`run_phase()` and `run_all_phases()` still share one dispatch table, so there's a single place defining what each
-phase does — `run_all_phases` loops `FULL_RUN_PHASES = (Phase.PHASE_1, Phase.PHASE_2, Phase.PHASE_3)` against the
-same map `run_phase` looks a single key up in. Phase 3 (`merge_bills_and_card_statements`, see "Phase 3: card
-statements matched through a yearly ledger" below) replaced the old `mock_phase3` placeholder and is part of every
-full run. The order matters: Phase 3 only sees bills Phase 2 didn't consume.
+Only `MainCriticalError` is caught. Anything else a phase raises propagates out of `main()`. The `finally` still
+sends the mail, the exit code is non-zero, and the upload is skipped, so SharePoint is never mutated on a failed run.
 
-`main()` passes `args.runtime_location` (not `args.input_location`, which never existed as a CLI attribute) to
-`run_phase` — a prior mismatch between this call and what `arguments.py` actually produces was fixed in commit
-`aa7dd21`; that call now lives in `main.py` rather than `__main__.py`, but the earlier fix still holds.
+### Runtime folder layout and `--mode`
 
-**One consequence of the merge worth knowing:** the `--phase` branch's `return` happens before `main()`'s
-`try`/`finally` block, so taking it skips the QA-report email entirely — `send_qa_report_mail()` never runs for a
-`--phase`-only invocation. This was already true before the merge (`run_phase()` was called from `__main__.py`
-without `main()` ever being invoked at all), so behavior is unchanged, just less obvious now that both paths are
-nested inside the same function. `configure_logging_from_settings()` *does* still run either way, since it happens
-before the `args.phase` check — only the mail send is skipped, not logging setup.
+Each run works on one local folder, `args.runtime_location` (default:
+`--onedrive-data-folder / --sharepoint-sync-folder`). `--sharepoint-sync-folder` defaults to
+`paths.py::sharepoint_sync_folder(mode)`:
 
-**A note on testing against a scoped folder:** `--sharepoint-sync-folder` uses `type=parse_directory`, which
-auto-creates the *local* target directory as part of argument parsing — before any sync runs, and regardless of
-whether that name means anything on the SharePoint side. A typo'd or wrong folder name here won't error at parse
-time; it silently creates an empty local directory, the sync then matches nothing remotely, and `run_all_phases`
-fails later with a `list_dir`/`ValueError` on a missing bills/payments subfolder. **Which subfolder it's looking
-for depends on `--mode`** (default `test`): under `Mode.TEST` that's `carpeta_proves/FACTURES_prova`/
-`carpeta_proves/Remeses_prova`; under `Mode.PROD` it's `FACTURES`/`Remeses` directly, no `carpeta_proves` nesting.
-See "Path and folder-name composition" below. If that error shows up, check the actual local folder contents, the
-real SharePoint path, and which `--mode` you ran with before assuming a code regression.
+| `--mode` | SharePoint folder synced | Bills deleted after a merge (`delete_processed`) |
+|---|---|---|
+| `prod` | `justifactu/runtime` | yes |
+| `test` (default) | `justifactu/runtime-test` | yes |
+| `dev` | `justifactu/runtime-test` | **no**, so local fixtures survive repeated runs |
+
+```text
+<runtime>/
+├── FACTURES/                        # FolderName.BILLS: bills named "F <sap_id>.pdf"
+├── Remeses/                         # FolderName.PAYMENTS: bank remittance PDFs
+├── Targetes/<year>/                 # FolderName.CARD_STATEMENTS: one ledger .xlsx + card statement PDFs
+└── FACTURES+PAGAMENTS/              # FolderName.BILLS_AND_PAYMENTS: all output
+    ├── <year>_FACTURA+PAGAMENT/{sap_id}_F_P.pdf
+    ├── QA_ERRORS/                   # QA report, copied after a full run
+    └── logs/                        # run log, copied after a full run
+```
+
+`mode` only selects the SharePoint folder and `delete_processed`. The folder *names* inside the runtime folder are
+the same in every mode.
+
+**Every path flag uses `type=parse_directory`, which creates the directory if it's missing.** A typo'd
+`--sharepoint-sync-folder` or `--runtime-location` doesn't fail at parse time. It creates an empty local folder and
+the run fails later with a `list_dir` `ValueError` on a missing `FACTURES/`. Check the actual folder before assuming
+a code regression.
 
 ### Path and folder-name composition: `defines.py` / `paths.py` / `defaults.py`
 
-**As of commit `64587cf`, every hardcoded folder/file-name string literal was removed from the codebase outside
-`defines.py`'s own enums** — this replaced a long-standing pattern where the same few segments (`"FACTURES_prova"`,
-`"service/onedrive/data"`, `"output"`, `"secrets"`, etc.) were duplicated or composed inline across `arguments.py`,
-`process.py`, `main.py`, `logger.py`, `secret.py`, and `vault.py`. The split, by concern:
+No module outside `defines.py` hardcodes a folder or file-name string.
 
-- **`defines.py`** holds *only* bare-name `StrEnum` members now — no `Path(...)`, no `/` joins, no composed values
-  of any kind (besides `ROOT_FOLDER` itself and the `NOW`/`DATETIME_FORMAT` timestamp constants, which were never
-  in scope for this cleanup). The `FolderPaths` enum that used to live here — down to its one surviving member,
-  `SHAREPOINT_SYNC_FOLDER` — was **deleted entirely**, along with the already-dead `_SHAREPOINT_INPUT_PATH`/
-  `_SHAREPOINT_OUTPUT_PATH` module-level helpers. If you're looking for `FolderPaths`, it no longer exists; its one
-  real consumer moved into `paths.py::sharepoint_sync_folder()` (below).
-- **`paths.py`** (new file) composes real runtime `Path`s from an already-resolved base directory (and a `Mode`,
-  where relevant) plus `FolderName` segments: `bills_folder(input_folder, mode)`, `payments_folder(input_folder,
-  mode)`, `merged_output_folder(input_folder)`, `qa_errors_folder(merged_output_folder)`,
-  `year_merged_folder(merged_output_folder, year)`, and `sharepoint_sync_folder()`. This replaced hand-rolled,
-  slightly-differently-written composition logic that used to be duplicated between `process.py::_phase_folders`
-  and `main.py`. `sharepoint_auth_folder()` — a best-effort reconstruction of the pre-`2ea3480`
-  `justifactu/_auth_sync` constant that had no caller anywhere in the codebase — was removed, along with its
-  backing `FolderName.AUTH_SYNC` member, since nothing ever used it.
-- **`defaults.py`** computes the `ROOT_FOLDER`-relative fallback `Path` for CLI flags that need one —
-  `default_onedrive_data_folder()`, `default_onedrive_conf_folder()`, `default_secrets_folder()` — all built from
-  `FolderName` segments only. This file already existed before `64587cf` but was **dead code**: `arguments.py` had
-  its own separate inline `Path` literals and never imported from it. It's actually wired up now.
+- **`defines.py`**: bare-name `StrEnum`s only (`FolderName`, `FileSuffix`, `Mode`, `Phase`, `Metric`,
+  `InputLocation`, `SyncDirection`, `SecretNames`) plus `ROOT_FOLDER`, `NOW`, `DATETIME_FORMAT`. No composed paths.
+- **`paths.py`**: composes runtime `Path`s from an already-resolved base folder: `bills_folder`, `payments_folder`,
+  `card_statements_folder`, `merged_bills_and_payments_folder`, `qa_errors_folder`, `logs_folder`,
+  `year_merged_folder`, `sharepoint_sync_folder(mode)`.
+- **`defaults.py`**: `ROOT_FOLDER`-relative fallbacks for CLI flags: `default_onedrive_data_folder`,
+  `default_onedrive_conf_folder`, `default_secrets_folder`.
 
-**The bills/payments test/production switch moved from an env-var-resolved `FolderName` member to an explicit
-`Mode`/`--mode` CLI flag.** The interim version of this (commit `b6b4e7c`) read `BILLS_INPUT_FOLDER`/
-`PAYMENTS_INPUT_FOLDER` environment variables into a single `FolderName.BILLS_INPUT`/`PAYMENTS_INPUT` pair at
-import time, with a module-level `IS_TEST_RUN` bool derived from whether those env vars were set. **That whole
-mechanism is gone as of `64587cf`.** Current shape:
+Tests build fixture folders from the enums (`FolderName.BILLS.value`, ...), never from string literals, so a
+rename of an enum value is caught by the suite.
 
-- `FolderName` has two explicit pairs: `BILLS_INPUT_PROD = "FACTURES"` / `BILLS_INPUT_TEST = "FACTURES_prova"` and
-  `PAYMENTS_INPUT_PROD = "Remeses"` / `PAYMENTS_INPUT_TEST = "Remeses_prova"`.
-- A new `Mode(StrEnum)` — `PROD = "prod"` / `TEST = "test"` — selected by a `--mode` CLI flag (`arguments.py`,
-  `parse_mode`), default `Mode.TEST`.
-- `paths.py::bills_folder`/`payments_folder` pick the `*_PROD`/`*_TEST` member based on `mode`, and **only under
-  `Mode.TEST`** additionally nest one level deeper under `FolderName.TEST_FOLDER = "carpeta_proves"` — e.g.
-  `<runtime>/carpeta_proves/FACTURES_prova` vs. `<runtime>/FACTURES`. This `carpeta_proves` nesting mirrors how
-  real local test fixtures are actually laid out on disk; production mode never has it.
-- `process.py`'s `_phase_folders`/`_build_phase_map`/`run_phase`/`run_all_phases` all take `mode: Mode` now and
-  thread it down into the two `paths.py` calls; `main()` passes `args.mode` into both.
+### The phase pipeline (`process.py`)
 
-**`service/agent/dockerfile/Dockerfile`'s `ENV BILLS_INPUT_FOLDER=FACTURES` / `ENV PAYMENTS_INPUT_FOLDER=Remeses`
-lines are leftovers from the interim `b6b4e7c` mechanism and are now dead** — nothing reads those env vars any
-more. Until a production Jenkins invocation explicitly adds `--mode prod` to its `make run` line, the job silently
-stays in `Mode.TEST` regardless of those `ENV` lines or anything else in the container.
+`_build_phase_map(input_folder, mode)` returns `{Phase: closure}`. `run_phase` calls one entry; `run_all_phases`
+calls every phase in `FULL_RUN_PHASES = (PHASE_1, PHASE_2, PHASE_3)` in order. Both paths share the same closures,
+so `--phase N` exercises exactly the production code. Phases pass nothing to each other in memory: each rediscovers
+its input from the filesystem, which is why the order matters.
 
-**`logger.py`'s `GENERAL_OUTPUT_FOLDER` got its own dedicated segment, fixing a real bug.** Between `69d4a89` and
-`64587cf`, `GENERAL_OUTPUT_FOLDER` was computed as `ROOT_FOLDER / FolderName.OUTPUT.value` — reusing `OUTPUT`
-(`"_output"`, the per-run merged-output subfolder nested under `args.runtime_location`) for an unrelated,
-top-level concept (the general log folder), which silently changed its actual value from `"output"` to
-`"_output"` and conflated two different things under one enum member. `defines.py` now has a separate
-`GENERAL_OUTPUT = "output"` member for this, plus `ADMIN_LOGS = "_admin_logs"` replacing the literal that used to
-be inline in `logger.py`.
+**Error-handling pattern:** low-level functions (`payments.py`, `pdf.py`, `bills.py`) raise specific exceptions
+from `custom_except.py` and log nothing. The loops in `process.py` catch them, write the QA line, count the metric
+and `continue`. Keep reporting decisions in `process.py`.
 
-**`secret.py`/`vault.py`** both now call `default_secrets_folder()` instead of each separately inlining
-`ROOT_FOLDER / "secrets"` — `vault.py` still imports `ROOT_FOLDER` directly too, since it's also used for an
-unrelated `ca_cert_path` resolution further down in the same file.
+**Metrics:** every phase function returns `Metrics = Counter[Metric]`. `run_all_phases` adds them with
+`Counter.update` (not `+`, which drops zero keys), and `process.py::log_run_summary(metrics, elapsed_seconds)` writes
+one `qa_report`-tagged INFO block:
 
-**Test fixture drift was fixed in the same commit.** `tests/conftest.py`'s `billing_dirs` fixture and all 7
-occurrences in `tests/test_pdf.py` previously hardcoded the literal strings `"FACTURES"`/`"Remeses"`/`"output"`
-directly rather than reading the enum — they happened to match `FolderName.BILLS_INPUT_PROD`/
-`PAYMENTS_INPUT_PROD`/`GENERAL_OUTPUT`'s values by coincidence, but would never have caught a future rename of
-those values, since the tests built their own fixture folders with the hardcoded names instead of reading the
-enum. Both now read `FolderName.BILLS_INPUT_PROD.value`/`PAYMENTS_INPUT_PROD.value`/`GENERAL_OUTPUT.value`
-directly. Two new test files were added alongside this: `tests/test_paths.py` (one test per `paths.py` function)
-and `tests/test_defaults.py` (one test per `defaults.py` function); `tests/test_arguments.py` gained cases for
-`--mode prod`/`--mode test`/the default.
+| `Metric` | Counted in |
+|---|---|
+| `TRASH_FILES` | Phase 1: `NotAPaymentFileError` (non-PDF in `Remeses`) |
+| `UNPARSEABLE_PAYMENTS` | Phase 1: `ParseSAPIdException` (no `Fra. <sap_id>` in the PDF) |
+| `PAYMENT_MERGES` | Phase 2: after a successful `merge_pdfs` |
+| `CARD_STATEMENT_MERGES` | Phase 3: after a successful `merge_pdfs` |
+| `FAILED_MERGES` | Phases 2 and 3: `MergingBillWithPaymentError` |
+| `UNMATCHED_BILLS` | Phase 3 only: bill with no payment and no card statement |
 
-### SAP ID is the correlation key between bills and payments
+The counts describe the current backlog, not what's new since the last run: trash, unparseable payments and
+unmatched bills stay where they are and are counted again every run.
 
-A bill and a payment are matched purely by a shared `SAP_ID` (`SAP_ID.py`) — a 4-digit year + 6-digit sequence,
-parsed via regex from two different sources:
+#### SAP ID: the correlation key
 
-- **Bills** arrive already named `F <sap_id>` (`bills.py::parse_bill_filename`).
-- **Payments** start as bank-statement PDFs with arbitrary filenames; `payments.py::rename_payments` extracts the
-  SAP ID from the PDF's *content* (`bills.py::parse_sap_id_from_bill`) and renames the file to `{sap_id}-P.pdf`
-  **on disk**, in place.
+`SAP_ID.py` validates `(?P<year>20\d{2})(?P<sapid>\d{6})` and compares by its full string, so every match below is a
+`dict.get(sap)`. It's built from three sources: the bill filename (`bills.py::parse_bill_filename`, `F <sap_id>`),
+the payment PDF's text (`payments.py::parse_sap_id_from_payment`, regex `Fra\.?\s+<sap_id>`, first match on the
+first matching page), and ledger column J (Phase 3).
 
-`process.py::merge_bills_and_payments` matches bills against an index of already-renamed payment files, merges each
-matched pair into one PDF under `{year}_FACTURA+PAGAMENT/{sap_id}_F_P.pdf`, then (`cleanup_processed_files`) renames
-the payment with a `_merged` suffix and deletes the bill. A bill with no direct payment isn't an error at this
-stage. Phase 2 only logs it at `info` level ("deferring to card statements") and leaves it in place for Phase 3. The
-QA error for a truly unmatched bill is raised by Phase 3, not Phase 2, so running `--phase 2` alone no longer
-QA-reports unmatched bills.
+#### Phase 1: rename payments (`process.py::rename_payments`)
 
-### Phase 3: card statements matched through a yearly ledger
+Walks `Remeses/` recursively (snapshot via `list(rglob)` before renaming). Skips folders and files already handled
+(`payments.py::is_renamed_payment`: stem contains `<sap_id>-P` or `<sap_id>-P_merged`). For every other file,
+`payments.py::rename_payment` raises `NotAPaymentFileError` for non-PDFs, raises `ParseSAPIdException` when no SAP ID
+is found, or renames the file in place to `{sap_id}-P.pdf`. Never merges, never touches bills.
 
-Card payments never carry a SAP ID themselves. They're linked to one through a hand-maintained Excel ledger, one
-per year, that sits next to that year's bank/card statement PDFs:
+#### Phase 2: bills × bank payments (`process.py::merge_bills_and_payments`)
+
+1. Indexes `Remeses/` by **filename** (`index_folder` + `payments.py::index_payments`), skipping `_merged` files.
+   Payments that Phase 1 never renamed have no SAP ID in their name and are skipped, so `--phase 2` on a fresh
+   folder matches nothing. (`freshly_renamed_payments` is a leftover parameter nothing passes any more.)
+2. For each bill in `FACTURES/`: non-PDF or bad name → QA line (Phase 2 owns these; Phase 3 skips them silently).
+   No payment → `info` only, deferred to Phase 3. Otherwise `merge_pdfs(bill, payment, output)` (bill first).
+3. `cleanup_processed_files`: renames the payment to `{sap_id}-P_merged.pdf` in every mode (the audit trail, and
+   what stops it matching again) and deletes the bill unless `dev`.
+
+Phase 2 does not check whether the output already exists; it overwrites it.
+
+#### Phase 3: remaining bills × card statements (`process.py::merge_bills_and_card_statements`)
+
+Card payments never carry a SAP ID. A hand-maintained Excel ledger per year links a card transaction
+(date + amount) to one:
 
 ```text
-<runtime>/Targetes/                    # FolderName.CARD_STATEMENTS, paths.py::card_statements_folder
-└── <year>/                            # any subfolder name works; every subfolder is scanned
-    ├── <anything>.xlsx                # exactly ONE ledger per year folder (Excel "~$" lock files ignored)
-    └── <anything>.pdf                 # the statement PDFs, any filename
+<runtime>/Targetes/
+└── <year>/                 # any subfolder name works; every subfolder is scanned
+    ├── <anything>.xlsx     # exactly ONE ledger per year folder (Excel "~$" lock files ignored)
+    └── <anything>.pdf      # the statement PDFs, any filename
 ```
 
-`process.py::merge_bills_and_card_statements` builds a `SAP_ID -> statement PDF` index across every year folder,
-then walks `FACTURES/`. Each bill whose SAP ID is in the index is merged with the **whole** statement PDF into the
-same `{year}_FACTURA+PAGAMENT/{sap_id}_F_P.pdf` output Phase 2 uses. The bill is deleted afterwards
-(`delete_processed = mode != Mode.DEV`). **Statements and ledgers are never renamed, moved or deleted.** One statement
-can back many bills, so it has to stay where it is.
+Builds a `SAP_ID -> statement PDF` index across every year folder, then walks `FACTURES/`. Already-existing output →
+skip (idempotency for `dev`). No match → QA error "No matching payment or card statement found", the only place an
+unmatched bill is reported. Otherwise the bill is merged with the **whole** statement into the same
+`{year}_FACTURA+PAGAMENT/{sap_id}_F_P.pdf` as Phase 2, and the bill is deleted unless `dev`. **Statements and
+ledgers are never renamed, moved or deleted**: one statement backs many bills. A missing `Targetes/` is QA-warned
+but the bill loop still runs, so every remaining bill is reported (guarded by
+`test_phase_3_qa_logs_unmatched_bill_when_targetes_missing`).
 
-What `bank_statement.py` does, in order:
+What `bank_statement.py` does:
 
-- `extract_bank_entries` parses statement rows with pdfplumber's `extract_words()`, grouping words into rows by
-  `top` coordinate (`_group_into_rows`, tolerance 1.0). A row counts as a transaction only if its first word is a
-  4-digit `DDMM` date (`DATE_PATTERN`). The concept is every word left of `CONCEPT_COLUMN_END_X = 289`, and the
-  total is the last word matching `AMOUNT_PATTERN` (Spanish format, `1.234,56`). These coordinates/patterns are
-  tuned to the current bank's statement layout. A different bank's PDF will need them revisited.
-- `_merge_commission_rows`: a row whose concept starts with `COMMISSION_MARKER` ("Comissió per conversió de
-  divises") is the currency-conversion fee for the previous transaction. It's folded into that row (totals summed,
-  first concept kept), because the ledger records the two as a single amount.
-- `read_sap_id_ledger` reads columns A (date, `DD/MM` text, often with a leading `'` that gets stripped),
-  H (total) and J (SAP ID) from the active sheet, starting at row 2, into a `(DDMM, round(total, 2)) -> SAP_ID`
-  dict. Rows with an empty column J are skipped silently. A non-numeric total or an invalid SAP ID is QA-logged
-  and skipped.
-- `_strip_autofilters`: the real ledgers carry a whole-row AutoFilter (`<autoFilter ref="1:644"/>`) that openpyxl
-  refuses to load. The workbook is copied into memory with every `<autoFilter>` element removed from
-  `xl/worksheets/*.xml`. The file on disk is never modified.
-- `index_statement_entries` joins the two on `(date, total)`. The match key is deliberately date + amount only,
-  with no concept. A statement entry with no ledger row is QA-logged and skipped.
-- `find_year_ledger` returns the single `.xlsx` in a year folder. Zero or more than one is a QA error, and that
-  whole year folder is skipped.
+- `extract_bank_entries`: pdfplumber `extract_words()`, grouped into rows by `top` (`_group_into_rows`, tolerance
+  1.0, sorted by `x0`). A row is a transaction only if its first word matches `DATE_PATTERN` (`DDMM`). Concept =
+  words left of `CONCEPT_COLUMN_END_X = 289`; total = last word matching `AMOUNT_PATTERN` (`1.234,56`). These are
+  tuned to the current bank's layout; a different bank needs them revisited.
+- `_merge_commission_rows`: a row starting with `COMMISSION_MARKER` ("Comissió per conversió de divises") is folded
+  into the previous same-date row (totals summed, first concept kept), because the ledger records them as one.
+- `read_sap_id_ledger`: active sheet from row 2, columns A (date, `'DD/MM` text, apostrophe stripped), H (total),
+  J (SAP ID) → `{(DDMM, round(total, 2)): SAP_ID}`. Empty J → skipped silently; non-numeric H or invalid J → QA.
+  Loads `_strip_autofilters(path)`, an in-memory copy with every `<autoFilter>` removed, because openpyxl rejects
+  the whole-row ranges (`ref="1:644"`) Excel writes. The file on disk is never modified.
+- `index_statement_entries`: joins on `(date, total)` (deliberately no concept). No ledger row → QA warning.
+- `find_year_ledger`: exactly one `.xlsx` per year folder, else QA error and the year is skipped.
 
-Only `.xlsx` ledgers are supported. `.xls` files are expected to be converted, not read.
+Only `.xlsx` is supported. Every statement is re-parsed and its ledger re-read on every run.
 
-Idempotency: a bill whose output PDF already exists is skipped, so DEV mode (bills kept) can be re-run safely. A
-missing `Targetes/` folder is QA-warned but doesn't end the phase early. Every remaining bill still gets its
-"No matching payment or card statement found" QA error (`tests/test_process.py::
-test_phase_3_qa_logs_unmatched_bill_when_targetes_missing` guards this).
+### Logging and the QA report (`logger.py`)
 
-Known costs: every statement is re-parsed and every ledger re-read on every run (once per statement). Every
-statement row without a ledger SAP ID is QA-logged again on every run, since statements never leave `Targetes/`.
-Two ledger rows with the same date and total collide, and the last one wins silently.
+- Format: `DD/MM/YYYY HH:MM:SS.mmm | LEVEL | logger | message` (`DATE_FORMAT` + `%(msecs)03d` in `MESSAGE_FORMAT`).
+  Don't use `%f` in `DATE_FORMAT`: logging formats dates with `time.strftime`, which doesn't support it.
+- `extra={"qa_report": True}` on any `log.*()` call routes that line into the separate QA report file
+  (`logs/<NOW>_qa_report.log`), via a handler with `QAFilesFilter` at **INFO** level (INFO so the run summary gets
+  in; untagged lines never do). The QA report is copied to `QA_ERRORS/` and mailed after a full run.
+- Log file names use `NOW` to the second: two runs starting in the same second share files.
+- The `RichHandler` runs with `markup=False`, and the `pdfminer`/`pdfplumber` loggers are pinned to `WARNING`:
+  pdfminer's debug output contains `[...]` sequences Rich parsed as markup and crashed on (`MarkupError`).
 
-### SharePoint/Graph API code: back, but only as a download fallback
+### OneDrive-for-Linux sync (`onedrive_sync.py`)
 
-`sharepoint.py` was deleted entirely in commit `ae2474f` as dead code, then **recreated in commit `d374242`** with
-a deliberately narrower scope than before: it's no longer the primary input path, and it no longer has the old
-upload/rename/delete-remote functions at all. It now exists purely to back up the OneDrive-for-Linux download step
-if that sync ever fails. Current contents: `get_site_id`, `get_drive_id`, `list_folder_contents`, `download_file`
-(retries on HTTP 503, raises `RuntimeError` after `max_retries`), `download_folder_recursive`, `download_input_folder`,
-and `connect_sharepoint` (no longer private/underscored — `main.py` calls it directly). `token_manager.py`, which
-had been sitting orphaned since `sharepoint.py`'s deletion, is live again as this module's only consumer of
-`TokenManager`/`get_token_manager`.
+`run_onedrive_sync` shells out to the real `onedrive` binary as a one-shot `--sync --download-only` /
+`--upload-only` pass and blocks until it exits. Never `--monitor` (that's the local-dev `compose.yml` only).
 
-**How the fallback is wired (`main.py`):** the download `run_onedrive_sync()` call is now in its own nested
-`try/except MainCriticalError`, not the outer one. On failure, it logs a warning and calls `connect_sharepoint()` +
-`download_input_folder(token_manager, drive_id, args.sharepoint_sync_folder, args.runtime_location)` — same remote
-scope and local destination the OneDrive sync would have used. If *that* also fails, the resulting exception is
-wrapped into a fresh `MainCriticalError` and re-raised, so it's still caught by the outer handler and still produces
-exactly one `log.critical` + `exit(1)` — not two stacked failures. Only the **download** step has this fallback;
-a failed upload or a failed phase still goes straight to the outer handler, no fallback attempted.
+- **Paths are CLI args:** `--confdir` = `args.onedrive_conf_folder`, `--syncdir` = `args.onedrive_data_folder`
+  (overrides `sync_dir` in `config`), `--single-directory` = `args.sharepoint_sync_folder`, the only scope filter.
+  There is no `sync_list` file: it was deliberately deleted after it conflicted with `--single-directory` and
+  caused a real local-data-loss incident. Don't reintroduce it.
+- **Defaults come from env vars first:** `OD_CONF` / `OD_DATA`, else `defaults.py`'s repo-relative folders. The
+  Jenkins agent image sets `ENV OD_CONF=/onedrive/conf` / `ENV OD_DATA=/onedrive/data`, so every process in that
+  container, including a manual `--auth`, uses the persistent volumes rather than the ephemeral workspace.
+- `--cleanup-local-files` only on the download; `--dry-run` only when `args.dry_run`. **`--dry-run` only affects
+  the sync calls**: the phases still run on whatever is on disk.
+- **The upload deletes remotely** whatever is missing locally (`--no-remote-delete` is deliberately not passed).
+  That's how deleted bills disappear from SharePoint, and why a phase must never be pointed at the synced folder
+  for experiments: the next full run uploads its changes.
+- Outside `--mode prod`, `_base_onedrive_args` adds `--verbose --verbose` (debug logging, needed to see why
+  OneDrive asks for a resync); in `prod` it's left out so logs don't grow unbounded.
+- **Exit code 126** ("resync required", e.g. the first sync after a fresh `--auth`) → retried once with
+  `--resync --resync-auth`.
+- `CalledProcessError` and `FileNotFoundError` (no `onedrive` binary) become `MainCriticalError` → `exit(1)`.
+- **`drive_id` is static.** `_write_drive_id_if_missing` writes the `DRIVE_ID` secret into
+  `service/onedrive/conf/config` only when the line is missing or empty, then leaves it. The earlier
+  write-then-erase-per-call design was dropped: the changing file made OneDrive's `.config.backup` check demand a
+  `--resync` on every run. The git-tracked `config` currently contains the real value.
 
-**Worth knowing before relying on this in production:** this reintroduces a second, independent SharePoint
-credential path (Graph app-only auth via `TokenManager` — `CLIENT_ID`/`CLIENT_SECRET`/`TENANT_ID`) alongside
-OneDrive-for-Linux's own delegated-user OAuth token. That's exactly the "two credentials to operate, authorize,
-rotate and monitor" situation `docs/explanation/onedrive_sync_and_orchestration.md`'s D19 decided to get away from.
-A fallback whose own credentials nobody is actively rotating is a fallback that can silently stop working — this
-hasn't been verified against the actual tenant's current app registration.
+**`--auth` bootstrap:** `run_onedrive_auth` runs `onedrive --confdir <c> --syncdir <d>` with no
+`--sync`/`--monitor`/`--single-directory`. On a `confdir` with no refresh token, OneDrive's `initialise()` drives
+the interactive OAuth flow and persists the token without transferring files. Re-running it once a token exists
+exits non-zero ("missing switches"); that's accepted, since `--auth` is a one-time action per system.
 
-`tests/test_sharepoint.py` was recreated in commit `3d88e85`, covering all seven functions above (the original
-file, before deletion, only ever tested `get_site_id`/`get_drive_id`/`list_folder_contents` — `download_file`,
-`download_folder_recursive`, `download_input_folder`, and `connect_sharepoint` are newly covered). Tests patch at
-`justifactu.sharepoint.X` (e.g. `justifactu.sharepoint.requests.get`, `justifactu.sharepoint.time.sleep`), matching
-how the module imports those names — patching the global `requests`/`time` modules instead would miss the binding.
+**Graph API download fallback (`sharepoint.py`, `token_manager.py`):** if the OneDrive download raises
+`MainCriticalError`, `main()` calls `connect_sharepoint()` + `download_input_folder(...)` into the same local folder.
+If that also fails, it's re-raised as one `MainCriticalError`. There is no upload fallback: SharePoint is only ever
+written by `onedrive --upload-only`. This is a second credential path (app-only `CLIENT_ID`/`CLIENT_SECRET`/
+`TENANT_ID`) next to OneDrive's delegated token, and it hasn't been verified against the tenant's current app
+registration. Tests patch at `justifactu.sharepoint.X` (e.g. `justifactu.sharepoint.requests.get`).
 
-Two smaller known-dead leftovers, not yet removed: `arguments.py::parse_input_location` (superseded by
-`parse_directory`'s auto-create behavior everywhere; only its own tests call it) and `filesystem.py::move_file`
-(tested in isolation, but no production code path calls it).
-
-`InputLocation` and the `-l/--location` CLI flag are in active use — `main.py`'s one-time `--auth` bootstrap is
-gated on `args.location == InputLocation.SHAREPOINT`.
-
-`--download-input` and `--onedrive-logs-folder` (`arguments.py`) were both removed outright in commit `aa7dd21` —
-the former was parsed but never read by any code path; the latter was parsed but never passed to the `onedrive`
-subprocess, and structurally couldn't be (no `log_dir` CLI equivalent exists in OneDrive-for-Linux).
-
-### OneDrive-for-Linux sync brackets the phase pipeline in `main()`
-
-**This whole section replaced a Docker-sidecar/env-var design with a fully CLI-args-driven one — the old
-`OD_CONFDIR` environment variable approach is gone.**
-
-`main()` calls `run_onedrive_sync()` (`onedrive_sync.py`) around the phase pipeline: once with
-`direction=SyncDirection.DOWNLOAD.value` before `run_all_phases()` (now with a Graph-API fallback on failure — see
-above), once with `direction=SyncDirection.UPLOAD.value` after it (no fallback). Each call shells out to the real
-`onedrive` binary as a one-shot `--sync --download-only`/`--upload-only` pass and blocks until it exits — never
-`onedrive --monitor` (the long-running mode `compose.yml`'s sidecar still uses for local dev only).
-
-**Every path OneDrive touches is now a CLI argument, not a hardcoded Docker path:**
-- `confdir` = `args.onedrive_conf_folder`, sync root = `args.onedrive_data_folder`, passed as `--syncdir` (overrides
-  the `config` file's own `sync_dir`). **As of commits `3e51de9`/`e358ef4`, both defaults resolve through an
-  environment variable before falling back to a repo-relative path:**
-  `Path(os.environ.get("OD_CONF", str(default_onedrive_conf_folder())))` and the equivalent `OD_DATA` /
-  `default_onedrive_data_folder()` pair (the fallback computation moved into `defaults.py` in commit `64587cf` —
-  see "Path and folder-name composition" above; the env-var-override behavior itself is unchanged). This fixes a
-  real bug: `ROOT_FOLDER` is computed from the source file's own location at import time, so the old plain default
-  pointed *inside whatever checkout happens to be running* — in the Jenkins agent, that's the ephemeral workspace
-  `checkout scm` wipes and recreates every build, not the persistent `/onedrive/conf`/`/onedrive/data` Docker
-  volumes `service/agent/compose.yml` actually mounts. A one-time `--auth` token written to the old default would
-  never survive to the next build.
-- sync scope = `args.sharepoint_sync_folder`, passed as `--single-directory` — this is the *only* scope filter;
-  there is no `sync_list` file anymore (deliberately deleted — it conflicted with `--single-directory` and caused a
-  real local-data-loss incident when both were active at once)
-- `args.runtime_location` (computed: `onedrive_data_folder / sharepoint_sync_folder`, auto-created via
-  `parse_directory` if missing) is what `run_all_phases` actually processes — `_output`/`QA_ERRORS` now nest
-  *inside* it (via `paths.py::merged_output_folder`/`qa_errors_folder`), specifically so the upload pass can
-  actually reach the merged-output/QA artifacts.
-
-**Why the fix lives at three layers, not just one:** `service/agent/dockerfile/Dockerfile` now sets
-`ENV OD_CONF=/onedrive/conf` and `ENV OD_DATA=/onedrive/data` at the *image* level — so any process started in that
-container inherits the right paths automatically, with no CLI flag needed, whether that's the Jenkinsfile's
-automated run or a human manually running `--auth` in a shell inside the container. `arguments.py` reading those
-env vars is what makes that inheritance actually work. The Jenkinsfile *also* passes
-`--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder ${OD_DATA}` explicitly on its `make run` line — redundant
-given the container-level env vars, but harmless, since it resolves to the same value either way. The important
-part is the container-level `ENV`: without it, only the Jenkinsfile's own automated invocation would get the right
-path, while a manually-run `--auth` bootstrap (which the Jenkinsfile never invokes — it's a human, one-time action)
-would still silently fall back to the wrong, ephemeral default unless someone remembered to type the override by
-hand. With it, both invocations are structurally guaranteed to agree, not just by coincidence of matching defaults.
-
-`--cleanup-local-files` is appended only on the download call, and `--dry-run` only when `args.dry_run` is set.
-**`--dry-run` only gates the OneDrive sync call itself** — it does not skip `run_all_phases()` afterward, so running
-`--dry-run` against a never-before-synced local folder leaves it empty and the phase pipeline will fail trying to
-read files that were never downloaded.
-
-**How `--sync`/`--monitor` actually interact with authentication** (confirmed against upstream `onedrive` source,
-not just docs): `main.d` calls `oneDriveApiInstance.initialise()` — where OAuth and token persistence happen —
-**unconditionally**, regardless of `--sync`/`--monitor`. The "switches missing" fail-fast error only fires when (1)
-a valid refresh token *already exists* on disk, or (2) `--auth-files`/`--auth-response` are used (a quirk specific
-to those flags, not a general rule). On a genuinely fresh, never-authenticated `confdir`, a plain invocation with
-no `--sync`/`--monitor`/`--single-directory` completes OAuth, persists the token, and exits `0` — no sync engine, no
-file transfer. This is exactly what the `--auth` bootstrap below now relies on.
-
-**The one-time `--auth` bootstrap** (`main.py`, gated on `args.auth and args.location == InputLocation.SHAREPOINT` —
-`--auth` is a plain `store_true` flag) was reworked in commit `2ea3480` to use a dedicated
-`onedrive_sync.py::run_onedrive_auth(confdir, data_folder)` function — **not** `run_onedrive_sync`. It shells out to
-just `onedrive --confdir <confdir> --syncdir <data_folder> --verbose`. No `--single-directory`, no `--sync`/
-`--monitor`, no `--dry-run`. On a `confdir` with no existing refresh token this drives the interactive OAuth flow
-and persists the token with no file listing or transfer at all (one caveat: the sync engine's own `initialise()`
-still makes two small Graph metadata calls — drive details and root details — not a bulk download). `exit(0)`
-immediately after, so phases/upload never run in this mode. This replaced the earlier design, which scoped a real
-`--sync --download-only` pass to a dedicated empty remote folder (the old `FolderPaths.SHAREPOINT_AUTH_PATH`,
-`justifactu/_auth_sync`) — that enum and its member no longer exist (and `FolderPaths` itself is gone entirely as
-of `64587cf` — see "Path and folder-name composition" above). **Known limitation of the new approach,
-intentionally accepted since `--auth` is documented as a one-time, per-new-system action:** re-running `--auth`
-after a token already exists for that `confdir` now exits non-zero ("missing switches") instead of the old design's
-harmless no-op, since the fast-fail path only triggers when a token is already present.
-
-`subprocess.CalledProcessError` and `FileNotFoundError` are both normalized into `MainCriticalError` in both
-`run_onedrive_sync` and `run_onedrive_auth`. **As of commit `ea6b710`, `main()`'s outer `except MainCriticalError`
-block logs the error and calls `exit(1)`** — before that, it only logged, so a failed sync, a failed upload, or a
-missing `onedrive` binary all produced exit code `0`, indistinguishable from success. This was the one thing making
-`docs/explanation/onedrive_sync_and_orchestration.md`'s D10/D15/D16/D23 and its §7.1/§9 (which all assume failures
-produce a non-zero exit, tripping Jenkins' `post { failure }`) actually true — before this commit, that whole
-design was describing behavior the code didn't have. The upload call is still only ever reached if every prior step
-(including a successful fallback, if the primary download failed) succeeded, so SharePoint is never mutated on a
-failed run.
-
-**`drive_id` is no longer permanently stored in the git-tracked config file** (commit `1a1fded`, revised in
-`fe369cb`/`8ec9257`). `service/onedrive/conf/config` now has `drive_id = ""` as a placeholder.
-`onedrive_sync.py::_write_drive_id` resolves the real value via `read_secret(SecretNames.DRIVE_ID.value)` (already
-mapped in `vault.py`'s `_SECRET_MAP`) and rewrites the `drive_id` line in the config file. `erase_drive_id` blanks
-it back to `""`. Both share one line-rewrite helper, `_set_drive_id(confdir, value)`. The write/erase happens
-per-call, wrapping each individual `onedrive` subprocess invocation (not once per whole process) — `main()`'s own
-`finally` block no longer calls `erase_drive_id` at all; that responsibility moved entirely into `onedrive_sync.py`.
-
-**As of commit `4cc2c62`, the erase is correctly guaranteed on every exit path.** `erase_drive_id(confdir)` is now
-called from a `finally` on the outer `try` in both `run_onedrive_sync` and `run_onedrive_auth`, so it runs whether
-the call succeeds, raises `CalledProcessError`/`FileNotFoundError` (both normalized into `MainCriticalError`), or
-hits something unexpected. (An earlier version of this — committed in `8ec9257` — called `erase_drive_id` as plain
-sequential code *after* a successful `subprocess.run`, which meant a failed sync skipped the erase entirely and
-left the real secret sitting in the git-tracked file with nothing left to clean it up, since the top-level backstop
-in `main()` was already gone. That's fixed now; don't reintroduce the sequential-call version.)
-
-`_base_onedrive_args`'s docstring (`"""Flags shared by every sync invocation (download/upload)."""`) is still
-slightly stale — `run_onedrive_auth` uses it too (see the module-layout note below), so it's shared by every
-invocation, not just sync. Minor, cosmetic, not yet fixed.
-
-**What's still only in `service/onedrive/conf/config`, with no CLI equivalent at all** (confirmed against the
-client's own docs): `sync_dir_permissions`, `sync_file_permissions`. (`sync_dir` is still physically present in the
-file but is dead weight — `--syncdir` on every call overrides it regardless of what's written there.)
-`onedrive --get-sharepoint-drive-id` can look up a drive ID without a sync (a one-off Graph query), which is a
-different thing from the `drive_id` secret-injection above but worth knowing about if that ID ever needs rediscovering.
-
-The deeper design rationale and decision log for this architecture live in the `docs` git submodule
-(`ICIQ-DMP/justifactu-docs`, `docs/explanation/onedrive_sync_and_orchestration.md`) — but several decisions there
-are now superseded by what's actually implemented (D6's "compile from source" was amended to installing via the
-OBS apt repo; D21's "remove `download_only`/keep `cleanup_local_files` in config" is now "remove both from config,
-make both per-call CLI flags instead"; the `--auth` design has changed twice since; D19's "drop Microsoft Graph
-entirely" is now only true for the *upload* side — Graph is back for download, as a fallback; and none of it yet
-reflects the `Mode`/`--mode`/`paths.py`/`defaults.py` split from `64587cf`). Treat the doc as historical context,
-not a live spec, until it's updated to match.
+The design rationale lives in the `docs` submodule (`ICIQ-DMP/justifactu-docs`,
+`docs/explanation/onedrive_sync_and_orchestration.md`), but parts of it are superseded (Graph is back as a
+download fallback, `drive_id` handling changed, `--mode` folders changed). Treat it as context, not a spec.
 
 ### Jenkins agent (`service/agent/`)
 
-A separate Docker image/compose stack from the app's own — `service/agent/dockerfile/Dockerfile` (built from
-`jenkins/ssh-agent`, installs Python + the `onedrive` binary via `install-onedrive-apt.sh`), `service/agent/
-entrypoint/entrypoint.sh`, and `service/agent/compose.yml` (volumes for `onedrive/conf`+`onedrive/data`, Vault
-AppRole secrets, an SSH-key bind mount). `make prodbuild`/`make prodrun` drive this compose file specifically.
+A separate image/compose stack from the app: `service/agent/dockerfile/Dockerfile` (from `jenkins/ssh-agent`,
+installs Python + the `onedrive` binary via `install-onedrive-apt.sh`), `entrypoint/entrypoint.sh`, and
+`compose.yml` (volumes for `onedrive/conf` + `onedrive/data`, Vault AppRole secrets, SSH-key bind mount).
 
-The agent currently joins an **external Docker network owned by a different project** (`justicier_justicier_net`,
-per the `networks:` TODO in `compose.yml`) — Jenkins' controller currently lives inside that other project's own
-compose stack, not an independent one yet. Don't rename/repoint that network reference without first confirming
-Jenkins has actually been given its own stack — doing so prematurely points at a network that doesn't exist yet and
-breaks the agent's startup.
+The agent joins an **external Docker network owned by another project** (`justicier_justicier_net`). Don't
+repoint it until Jenkins has its own stack, or the agent fails to start.
 
-`Jenkinsfile` (repo root) is explicitly marked **draft, not wired into any real Jenkins job** — currently a
-single-stage pipeline (`make install && make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder
-${OD_DATA} --mode prod"`), no `checkout scm` stage, no cron trigger, no build timeout. `OD_CONF`/`OD_DATA` are
-real, live-read environment variables (set at the
-container level in `service/agent/dockerfile/Dockerfile`, consumed via `defaults.py` by `arguments.py`'s CLI-arg
-defaults). The `post` blocks call `make notify` (`notify.py`) rather than the Jenkins `emailext` step, for the
-`failure`/`aborted` notifications. Don't treat this file as a finished, production-ready pipeline.
+`Jenkinsfile` is a **draft, not wired to any job**: one stage running
+`make install && make run CMD="--onedrive-conf-folder ${OD_CONF} --onedrive-data-folder ${OD_DATA} --mode prod"`,
+no `checkout scm`, no cron trigger, no timeout. Its `post` blocks call `make notify` (`notify.py`).
 
 ### Module layout (only the non-obvious relationships)
 
-- `defines.py` → bare-name `StrEnum`s only (`FolderName`, `Mode`, `Phase`, `InputLocation`, `SyncDirection`,
-  `FileSuffix`, `SecretNames`) plus `ROOT_FOLDER`/`NOW`/`DATETIME_FORMAT`. No composed `Path`s, no `FolderPaths`
-  (removed in `64587cf`) — see "Path and folder-name composition" above.
-- `paths.py` → composes runtime `Path`s from an already-resolved base directory (+ `Mode` where relevant) and
-  `FolderName` segments; replaces the hand-rolled joins that used to be duplicated in `process.py`/`main.py`.
-- `defaults.py` → composes the `ROOT_FOLDER`-relative fallback `Path`s `arguments.py`'s CLI flags fall back to
-  when no override is given; existed before `64587cf` but was dead code until that commit actually wired
-  `arguments.py` up to call it.
-- `arguments.py` → `defines.py`/`defaults.py`/`paths.py`: CLI flags validate against enums defined in `defines.py`
-  (`Phase`, `Mode`, `InputLocation`) via small `parse_*` functions, each raising a specific `custom_except.py`
-  exception on invalid input. `parse_directory` (distinct from the now-orphaned `parse_input_location`)
-  auto-creates a missing directory rather than erroring, used by every OneDrive-path argument.
-- `onedrive_sync.py`: `_base_onedrive_args(confdir, data_folder)` builds the flags common to **every** invocation
-  (`--confdir`, `--syncdir`, `--verbose`) — as of commit `8ec9257`, `single_dir`/`--single-directory` moved *out* of
-  it and into `run_onedrive_sync` itself (the only caller that needs it), and `run_onedrive_auth` was switched to
-  use the shared helper too, removing what used to be a duplicated inline arg list between the two functions.
-  `_write_drive_id`/`erase_drive_id` (both via `_set_drive_id`) handle the `drive_id` secret injection per call,
-  with the erase now correctly guaranteed via `finally` as of `4cc2c62` — see above.
-- `sharepoint.py`: Graph API fallback for the OneDrive download step only — see "SharePoint/Graph API code" above.
-  Not used for upload under any circumstance; `onedrive --upload-only` remains the only upload path.
-- `logger.py`: a `extra={"qa_report": True}` tag on any `log.*()` call routes that line into a separate QA report
-  file (mailed via `mail.py::send_qa_report_mail`), independent of the main run log. The `RichHandler` runs with
-  `markup=False`, and the `pdfminer`/`pdfplumber` loggers are pinned to `WARNING`. pdfminer's debug messages contain
-  `[...]` sequences that Rich tried to parse as markup and crashed on (`MarkupError`) during Phase 3.
-- `secret.py` / `vault.py`: secrets resolve through a fallback chain (mounted Docker secret → `default_secrets_folder()`
-  → env var → HashiCorp Vault), so the same code runs unmodified in local dev and deployed containers. `vault.py`'s
-  `_SECRET_MAP` is the authoritative list of which `SecretNames` values actually have a Vault path configured.
-- `notify.py`: standalone entry point (`justifactu-notify` console script, `make notify`) for a one-off
-  notification email with optional attachments — calls `mail.py::send_mail_authenticated` directly and lets
-  exceptions propagate, unlike `main()`'s own QA-mail call which swallows failures. Used by the `Jenkinsfile`'s
-  `post { failure }`/`post { aborted }` blocks instead of the Jenkins `emailext` step.
-- `bank_statement.py`: Phase 3's statement parsing and ledger reading. See "Phase 3: card statements matched
-  through a yearly ledger" above. `process.py` only calls `find_year_ledger` and `index_statement_entries`.
+- `arguments.py`: flags validate against `defines.py` enums via small `parse_*` functions that raise
+  `custom_except.py` exceptions. `-l/--location` gates `--auth` (`InputLocation.SHAREPOINT`).
+- `payments.py`: single-file operations only (`rename_payment`, `is_renamed_payment`,
+  `parse_sap_id_from_payment`, `index_payments`). The Phase 1 loop lives in `process.py`.
+- `pdf.py::merge_pdfs`: wraps `PyPdfError`/`OSError` into `MergingBillWithPaymentError` and deletes a half-written
+  output, so a later run doesn't mistake it for a finished merge.
+- `filesystem.py::change_file_name`: renames even if the target exists (only logs a warning), which **replaces**
+  the existing file on Linux. See "Known issues".
+- `secret.py` / `vault.py`: secrets resolve through mounted Docker secret → `default_secrets_folder()` → env var →
+  HashiCorp Vault. `vault.py::_SECRET_MAP` is the authoritative list of secrets with a Vault path.
+- `notify.py`: standalone entry point (`make notify`) for one-off emails; lets exceptions propagate, unlike
+  `main()`'s QA mail.
+
+### Known issues and leftovers
+
+- **Duplicate SAP IDs silently overwrite payments.** Two bank PDFs with the same `Fra. <sap_id>` → the second
+  Phase 1 rename replaces the first file (see `change_file_name`). Same risk at the `_merged` rename.
+- **A failed Phase 2 merge also counts as unmatched**: the bill stays, Phase 3 can't find it in a statement.
+- **A corrupt card statement or ledger still crashes the run**: Phase 3's index loop doesn't catch pdfplumber /
+  openpyxl / `zipfile` errors.
+- **A remittance is matched to one SAP ID only**: Phase 1 takes the first `Fra.` match in the PDF.
+- `main.py` still has `# NEW` / `# CHANGED` markers on the metrics lines (cosmetic).
+- `pyproject.toml` lists `types-openpyxl` in runtime `dependencies`; it belongs in the `dev` extras.
+- Dead code: `arguments.py::parse_input_location`, `filesystem.py::move_file`, the `freshly_renamed_payments`
+  parameter. `Dockerfile`'s `ENV BILLS_INPUT_FOLDER`/`PAYMENTS_INPUT_FOLDER` are read by nothing.
+- `Jenkinsfile`'s `aborted` message still mentions a 20h initial-sync timeout that no longer applies.
+- `_base_onedrive_args`' docstring says "every sync invocation"; `run_onedrive_auth` uses it too.

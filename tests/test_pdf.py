@@ -17,6 +17,8 @@
 from unittest.mock import patch
 
 import pytest
+from pypdf import PdfReader, PdfWriter
+from pypdf.generic import RectangleObject
 
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID, pattern, parse_sap_id_from_string
@@ -38,6 +40,7 @@ from justifactu.process import (
 from justifactu.filesystem import index_folder
 from justifactu.pdf import (
     merge_pdfs,
+    HighlightBox,
 )
 
 id_sap_instance = SAP_ID("2034567890")
@@ -383,3 +386,73 @@ def test_merge_bills_and_payments_delete_processed(mock_cleanup, billing_dirs):
     merge_bills_and_payments(bills_dir, payments_dir, output_dir, delete_processed=True)
 
     assert mock_cleanup.call_args.args[2] is True  # delete_processed passed through
+
+
+# ── merge_pdfs highlights ────────────────────────────────────────────────────
+
+
+def _highlight_rects(pdf_path) -> dict[int, list[list[float]]]:
+    """Page index -> rects of every /Highlight annotation on that page."""
+    rects: dict[int, list[list[float]]] = {}
+    for index, page in enumerate(PdfReader(pdf_path).pages):
+        for annotation in page.get("/Annots", []):
+            annotation = annotation.get_object()
+            if annotation["/Subtype"] == "/Highlight":
+                rects.setdefault(index, []).append(
+                    [round(float(v), 2) for v in annotation["/Rect"]]
+                )
+    return rects
+
+
+def _two_page_pdf(path) -> None:
+    writer = PdfWriter()
+    writer.add_blank_page(width=612, height=792)
+    writer.add_blank_page(width=612, height=792)
+    with open(path, "wb") as f:
+        writer.write(f)
+
+
+def test_merge_pdfs_without_highlights_adds_no_annotations(tmp_path):
+    first = tmp_path / "bill.pdf"
+    second = tmp_path / "statement.pdf"
+    output = tmp_path / "merged.pdf"
+    create_blank_pdf(first)
+    create_blank_pdf(second)
+
+    merge_pdfs(first, second, output)
+
+    assert _highlight_rects(output) == {}
+
+
+def test_merge_pdfs_highlights_box_on_second_pdf_page(tmp_path):
+    bill = tmp_path / "bill.pdf"
+    statement = tmp_path / "statement.pdf"
+    output = tmp_path / "merged.pdf"
+    create_blank_pdf(bill)  # 1 page
+    _two_page_pdf(statement)
+    box = HighlightBox(page=1, x0=40.0, top=134.0, x1=475.0, bottom=144.0)
+
+    merge_pdfs(bill, statement, output, highlights=[box])
+
+    # statement page 1 is output page 2; y is flipped from the 792pt page top,
+    # with 1pt of padding on every side
+    assert _highlight_rects(output) == {2: [[39.0, 647.0, 476.0, 659.0]]}
+    annotation = PdfReader(output).pages[2]["/Annots"][0].get_object()
+    assert [float(c) for c in annotation["/C"]] == [1.0, 1.0, 0.0]  # yellow
+
+
+def test_merge_pdfs_highlight_follows_shifted_mediabox(tmp_path):
+    bill = tmp_path / "bill.pdf"
+    statement = tmp_path / "statement.pdf"
+    output = tmp_path / "merged.pdf"
+    create_blank_pdf(bill)
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=612, height=792)
+    page.mediabox = RectangleObject([10, 20, 622, 812])
+    with open(statement, "wb") as f:
+        writer.write(f)
+    box = HighlightBox(page=0, x0=40.0, top=134.0, x1=475.0, bottom=144.0)
+
+    merge_pdfs(bill, statement, output, highlights=[box])
+
+    assert _highlight_rects(output) == {1: [[49.0, 667.0, 486.0, 679.0]]}

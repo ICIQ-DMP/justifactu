@@ -16,7 +16,7 @@
 import io
 import re
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TypedDict, cast
 
@@ -26,6 +26,7 @@ import pdfplumber
 from .SAP_ID import SAP_ID
 from .custom_except import ParseSAPIdException
 from .logger import get_logger
+from .pdf import HighlightBox
 
 log = get_logger(__name__)
 
@@ -43,7 +44,9 @@ class Word(TypedDict):
 
     text: str
     x0: float
+    x1: float
     top: float
+    bottom: float
 
 
 @dataclass
@@ -51,6 +54,7 @@ class BankEntry:
     date: str  # DDMM
     concept: str
     total: float
+    boxes: list[HighlightBox] = field(default_factory=list, compare=False)
 
 
 def _strip_autofilters(path: Path) -> io.BytesIO:
@@ -86,6 +90,7 @@ def _merge_commission_rows(entries: list[BankEntry]) -> list[BankEntry]:
                     date=previous.date,
                     concept=previous.concept,
                     total=round(previous.total + entry.total, 2),
+                    boxes=previous.boxes + entry.boxes,
                 )
             )
         else:
@@ -109,6 +114,17 @@ def _group_into_rows(words: list[Word], tolerance: float = 1.0) -> list[list[Wor
     return rows
 
 
+def _row_box(page_index: int, row: list[Word]) -> HighlightBox:
+    """The smallest box around every word in a row."""
+    return HighlightBox(
+        page=page_index,
+        x0=min(w["x0"] for w in row),
+        top=min(w["top"] for w in row),
+        x1=max(w["x1"] for w in row),
+        bottom=max(w["bottom"] for w in row),
+    )
+
+
 def _parse_amount(text: str) -> float:
     return float(text.replace(".", "").replace(",", "."))
 
@@ -117,7 +133,7 @@ def extract_bank_entries(pdf_path: Path) -> list[BankEntry]:
     """Parses every transaction row out of a bank statement PDF."""
     entries: list[BankEntry] = []
     with pdfplumber.open(pdf_path) as pdf:
-        for page in pdf.pages:
+        for page_index, page in enumerate(pdf.pages):
             # pdfplumber's own return type is an untyped dict shape; Word
             # documents the fields this module actually relies on.
             words = cast(list[Word], page.extract_words())
@@ -142,7 +158,14 @@ def extract_bank_entries(pdf_path: Path) -> list[BankEntry]:
                     continue
                 total = _parse_amount(amount_words[-1])
 
-                entries.append(BankEntry(date=date, concept=concept, total=total))
+                entries.append(
+                    BankEntry(
+                        date=date,
+                        concept=concept,
+                        total=total,
+                        boxes=[_row_box(page_index, row)],
+                    )
+                )
     return _merge_commission_rows(entries)
 
 

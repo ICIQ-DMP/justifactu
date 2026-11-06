@@ -34,6 +34,7 @@ from justifactu.bank_statement import (
     find_year_ledger,
 )
 from justifactu.SAP_ID import SAP_ID
+from justifactu.pdf import HighlightBox
 
 sap_id = "2034567890"
 
@@ -102,9 +103,9 @@ def test_extract_bank_entries_parses_valid_row(tmp_path):
 
     mock_page = MagicMock()
     mock_page.extract_words.return_value = [
-        {"text": "0101", "x0": 0.0, "top": 100.0},
-        {"text": "Compra", "x0": 70.0, "top": 100.0},
-        {"text": "56,78", "x0": 300.0, "top": 100.0},
+        {"text": "0101", "x0": 0.0, "x1": 20.0, "top": 100.0, "bottom": 110.0},
+        {"text": "Compra", "x0": 70.0, "x1": 90.0, "top": 100.0, "bottom": 110.0},
+        {"text": "56,78", "x0": 300.0, "x1": 320.0, "top": 100.0, "bottom": 110.0},
     ]
     mock_pdf = MagicMock()
     mock_pdf.pages = [mock_page]
@@ -125,9 +126,9 @@ def test_extract_bank_entries_skips_non_transaction_rows(tmp_path):
 
     mock_page = MagicMock()
     mock_page.extract_words.return_value = [
-        {"text": "01001", "x0": 0.0, "top": 100.0},
-        {"text": "Compra", "x0": 70.0, "top": 100.0},
-        {"text": "56,78", "x0": 300.0, "top": 100.0},
+        {"text": "01001", "x0": 0.0, "x1": 20.0, "top": 100.0, "bottom": 110.0},
+        {"text": "Compra", "x0": 70.0, "x1": 90.0, "top": 100.0, "bottom": 110.0},
+        {"text": "56,78", "x0": 300.0, "x1": 320.0, "top": 100.0, "bottom": 110.0},
     ]
     mock_pdf = MagicMock()
     mock_pdf.pages = [mock_page]
@@ -148,8 +149,8 @@ def test_extract_bank_entries_skips_row_with_no_amount(tmp_path):
 
     mock_page = MagicMock()
     mock_page.extract_words.return_value = [
-        {"text": "0101", "x0": 0.0, "top": 100.0},
-        {"text": "Compra", "x0": 70.0, "top": 100.0},
+        {"text": "0101", "x0": 0.0, "x1": 20.0, "top": 100.0, "bottom": 110.0},
+        {"text": "Compra", "x0": 70.0, "x1": 90.0, "top": 100.0, "bottom": 110.0},
     ]
     mock_pdf = MagicMock()
     mock_pdf.pages = [mock_page]
@@ -170,10 +171,10 @@ def test_extract_bank_entries_excludes_words_past_concept_column(tmp_path):
 
     mock_page = MagicMock()
     mock_page.extract_words.return_value = [
-        {"text": "0101", "x0": 0.0, "top": 100.0},
-        {"text": "Compra", "x0": 70.0, "top": 100.0},
-        {"text": "Patata", "x0": 290.0, "top": 100.0},
-        {"text": "56,78", "x0": 300.0, "top": 100.0},
+        {"text": "0101", "x0": 0.0, "x1": 20.0, "top": 100.0, "bottom": 110.0},
+        {"text": "Compra", "x0": 70.0, "x1": 90.0, "top": 100.0, "bottom": 110.0},
+        {"text": "Patata", "x0": 290.0, "x1": 310.0, "top": 100.0, "bottom": 110.0},
+        {"text": "56,78", "x0": 300.0, "x1": 320.0, "top": 100.0, "bottom": 110.0},
     ]
     mock_pdf = MagicMock()
     mock_pdf.pages = [mock_page]
@@ -194,14 +195,14 @@ def test_extract_bank_entries_combines_multiple_pages(tmp_path):
     mock_page_1 = MagicMock()
     mock_page_2 = MagicMock()
     mock_page_1.extract_words.return_value = [
-        {"text": "0101", "x0": 0.0, "top": 100.0},
-        {"text": "Compra", "x0": 70.0, "top": 100.0},
-        {"text": "56,78", "x0": 300.0, "top": 100.0},
+        {"text": "0101", "x0": 0.0, "x1": 20.0, "top": 100.0, "bottom": 110.0},
+        {"text": "Compra", "x0": 70.0, "x1": 90.0, "top": 100.0, "bottom": 110.0},
+        {"text": "56,78", "x0": 300.0, "x1": 320.0, "top": 100.0, "bottom": 110.0},
     ]
     mock_page_2.extract_words.return_value = [
-        {"text": "0202", "x0": 0.0, "top": 100.0},
-        {"text": "Taxi", "x0": 70.0, "top": 100.0},
-        {"text": "82,99", "x0": 300.0, "top": 100.0},
+        {"text": "0202", "x0": 0.0, "x1": 20.0, "top": 100.0, "bottom": 110.0},
+        {"text": "Taxi", "x0": 70.0, "x1": 90.0, "top": 100.0, "bottom": 110.0},
+        {"text": "82,99", "x0": 300.0, "x1": 320.0, "top": 100.0, "bottom": 110.0},
     ]
     mock_pdf = MagicMock()
     mock_pdf.pages = [mock_page_1, mock_page_2]
@@ -489,3 +490,81 @@ def test_strip_autofilters_leaves_original_file_untouched(tmp_path):
     _strip_autofilters(ledger_path)
 
     assert ledger_path.read_bytes() == before
+
+
+# ── highlight boxes ──────────────────────────────────────────────────────────
+
+
+def test_extract_bank_entries_records_row_box(tmp_path):
+    pdf_path = tmp_path / "statement.pdf"
+    pdf_path.touch()
+
+    mock_page = MagicMock()
+    mock_page.extract_words.return_value = [
+        {"text": "0101", "x0": 10.0, "x1": 30.0, "top": 100.0, "bottom": 110.0},
+        {"text": "Compra", "x0": 70.0, "x1": 100.0, "top": 100.5, "bottom": 111.0},
+        {"text": "56,78", "x0": 300.0, "x1": 325.0, "top": 100.0, "bottom": 110.0},
+    ]
+    mock_pdf = MagicMock()
+    mock_pdf.pages = [mock_page]
+    mock_pdfplumber_open = MagicMock()
+    mock_pdfplumber_open.__enter__.return_value = mock_pdf
+
+    with patch(
+        "justifactu.bank_statement.pdfplumber.open", return_value=mock_pdfplumber_open
+    ):
+        result = extract_bank_entries(pdf_path)
+
+    assert result[0].boxes == [
+        HighlightBox(page=0, x0=10.0, top=100.0, x1=325.0, bottom=111.0)
+    ]
+
+
+def test_extract_bank_entries_records_page_index(tmp_path):
+    pdf_path = tmp_path / "statement.pdf"
+    pdf_path.touch()
+    mock_page_1 = MagicMock()
+    mock_page_2 = MagicMock()
+    mock_page_1.extract_words.return_value = []
+    mock_page_2.extract_words.return_value = [
+        {"text": "0202", "x0": 0.0, "x1": 20.0, "top": 50.0, "bottom": 60.0},
+        {"text": "Taxi", "x0": 70.0, "x1": 90.0, "top": 50.0, "bottom": 60.0},
+        {"text": "82,99", "x0": 300.0, "x1": 320.0, "top": 50.0, "bottom": 60.0},
+    ]
+    mock_pdf = MagicMock()
+    mock_pdf.pages = [mock_page_1, mock_page_2]
+    mock_pdfplumber_open = MagicMock()
+    mock_pdfplumber_open.__enter__.return_value = mock_pdf
+
+    with patch(
+        "justifactu.bank_statement.pdfplumber.open", return_value=mock_pdfplumber_open
+    ):
+        result = extract_bank_entries(pdf_path)
+
+    assert [box.page for box in result[0].boxes] == [1]
+
+
+def test_merge_commission_rows_keeps_both_boxes():
+    purchase_box = HighlightBox(page=0, x0=0.0, top=100.0, x1=320.0, bottom=110.0)
+    commission_box = HighlightBox(page=0, x0=0.0, top=112.0, x1=320.0, bottom=122.0)
+    main_entry = BankEntry(
+        date="0105", concept="AAA", total=12.34, boxes=[purchase_box]
+    )
+    commission_entry = BankEntry(
+        date="0105",
+        concept="Comissió per conversió de divises (*)",
+        total=1.0,
+        boxes=[commission_box],
+    )
+
+    result = _merge_commission_rows([main_entry, commission_entry])
+
+    assert result[0].boxes == [purchase_box, commission_box]
+
+
+def test_bank_entry_equality_ignores_boxes():
+    box = HighlightBox(page=0, x0=0.0, top=100.0, x1=320.0, bottom=110.0)
+
+    assert BankEntry(date="0101", concept="Compra", total=56.78, boxes=[box]) == (
+        BankEntry(date="0101", concept="Compra", total=56.78)
+    )

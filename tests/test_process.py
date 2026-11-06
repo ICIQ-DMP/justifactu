@@ -21,6 +21,7 @@ import pytest
 
 from conftest import create_blank_pdf
 from justifactu.SAP_ID import SAP_ID
+from justifactu.bank_statement import BankEntry
 from justifactu.defines import FileSuffix, Mode, Phase, Metric
 from justifactu.paths import (
     bills_folder,
@@ -29,6 +30,7 @@ from justifactu.paths import (
     year_merged_folder,
 )
 from justifactu.logger import configure_logging_from_settings
+from justifactu.pdf import HighlightBox
 from justifactu.process import (
     FULL_RUN_PHASES,
     log_run_summary,
@@ -321,3 +323,30 @@ def test_log_run_summary_is_written_to_qa_report(tmp_path):
     assert "Bills with no matching payment: 4" in content
     assert "Non-payment files in Remeses: 1" in content
     assert "Payment files with unparseable SAP ID: 6" in content
+
+
+# ── phase 3 highlighting ─────────────────────────────────────────────────────
+
+
+def test_phase_3_passes_statement_row_boxes_to_merge(tmp_path):
+    bills_dir, _, statement, merge_dir = _card_layout(tmp_path)
+    create_blank_pdf(bills_dir / f"F {CARD_SAP_ID}.pdf")
+    box = HighlightBox(page=0, x0=40.0, top=134.0, x1=475.0, bottom=144.0)
+    entry = BankEntry(date="1403", concept="AMAZON", total=56.78, boxes=[box])
+
+    with (
+        patch(
+            "justifactu.process.index_statement_entries",
+            return_value={CARD_SAP_ID: entry},
+        ),
+        patch("justifactu.process.merge_pdfs") as mock_merge,
+    ):
+        merge_bills_and_card_statements(
+            bills_dir,
+            card_statements_folder(tmp_path),
+            merge_dir,
+            delete_processed=False,
+        )
+
+    assert mock_merge.call_args.args[1] == statement
+    assert mock_merge.call_args.kwargs["highlights"] == [box]

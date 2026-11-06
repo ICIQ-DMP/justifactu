@@ -20,7 +20,7 @@ from pathlib import Path
 from typing import Callable
 
 from .SAP_ID import SAP_ID
-from .bank_statement import find_year_ledger, index_statement_entries
+from .bank_statement import find_year_ledger, index_statement_entries, BankEntry
 from .bills import parse_bill_filename
 from .custom_except import (
     MergingBillWithPaymentError,
@@ -172,15 +172,16 @@ def merge_bills_and_card_statements(
     ledgers are never renamed or moved."""
     metrics: Metrics = Counter()
 
-    statement_by_sap: dict[SAP_ID, Path] = {}
+    statement_by_sap: dict[SAP_ID, tuple[Path, BankEntry]] = {}
     if cards_folder.is_dir():
         for year_folder in sorted(p for p in cards_folder.iterdir() if p.is_dir()):
             ledger_path = find_year_ledger(year_folder)
             if ledger_path is None:
                 continue
             for statement in sorted(year_folder.glob("*.pdf")):
-                for sap_id in index_statement_entries(statement, ledger_path):
-                    statement_by_sap[sap_id] = statement
+                entries = index_statement_entries(statement, ledger_path)
+                for sap_id, entry in entries.items():
+                    statement_by_sap[sap_id] = (statement, entry)
     else:
         log.warning(f"{cards_folder} is not a directory", extra={"qa_report": True})
 
@@ -199,8 +200,8 @@ def merge_bills_and_card_statements(
         if output_path.exists():
             continue
 
-        matched_statement = statement_by_sap.get(sap)
-        if matched_statement is None:
+        match = statement_by_sap.get(sap)
+        if match is None:
             log.error(
                 f"No matching payment or card statement found for bill {bill_path}",
                 extra={"qa_report": True},
@@ -208,12 +209,16 @@ def merge_bills_and_card_statements(
             metrics[Metric.UNMATCHED_BILLS] += 1
             continue
 
+        matched_statement, entry = match
         output_folder_path.mkdir(parents=True, exist_ok=True)
         try:
             log.info(
                 f"Merging {bill_path.name} with card statement {matched_statement.name}..."
             )
-            merge_pdfs(bill_path, matched_statement, output_path)
+            # Highlights the statement row(s) that pay this bill.
+            merge_pdfs(
+                bill_path, matched_statement, output_path, highlights=entry.boxes
+            )
         except MergingBillWithPaymentError as e:
             log.error(
                 f"Failed to process {bill_path.name}: {e}", extra={"qa_report": True}
